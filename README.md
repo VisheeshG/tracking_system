@@ -26,17 +26,6 @@ A comprehensive link tracking platform built with Next.js and Supabase that enab
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 
-4. **Set up Supabase database**
-
-   - Create a new Supabase project
-   - Run the migration file: `supabase/migrations/20241001000000_initial_schema.sql`
-   - This will create all necessary tables and policies
-
-5. **Run the development server**
-
-```bash
-npm run dev
-```
 
 6. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
