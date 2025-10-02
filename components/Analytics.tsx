@@ -61,10 +61,10 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
       };
 
       clicks?.forEach((click) => {
-        if (click.platform_name) {
-          analyticsData.clicksByPlatform[click.platform_name] =
-            (analyticsData.clicksByPlatform[click.platform_name] || 0) + 1;
-        }
+        // Use short_code as platform for analytics
+        const platformName = click.platform_name || link.short_code;
+        analyticsData.clicksByPlatform[platformName] =
+          (analyticsData.clicksByPlatform[platformName] || 0) + 1;
 
         if (click.creator_username) {
           analyticsData.clicksByCreator[click.creator_username] =
@@ -107,7 +107,7 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
 
   const baseUrl = window.location.origin;
   const trackingUrl = `${baseUrl}/l/${link.short_code}`;
-  const exampleUrl = `${trackingUrl}/goc/johndoe/sub1`;
+  const exampleUrl = `${trackingUrl}/johndoe/sub1`;
 
   if (loading) {
     return (
@@ -131,6 +131,9 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
 
           <div>
             <h1 className="text-3xl font-bold text-slate-900">{link.title}</h1>
+            <p className="text-sm text-slate-600 mt-1">
+              Analytics for Platform: {link.short_code}
+            </p>
             <div className="mt-3 space-y-2">
               <div className="flex items-center space-x-2 text-sm">
                 <span className="text-slate-600 font-medium">Destination:</span>
@@ -220,11 +223,11 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
             Tracking URL Format
           </h3>
           <p className="text-sm text-slate-600 mb-3">
-            Use this format to track different platforms, creators, and
-            submissions:
+            Use this format to track different creators and submissions for this
+            platform:
           </p>
           <code className="block bg-white px-4 py-3 rounded-lg font-mono text-sm text-slate-800 mb-2">
-            {trackingUrl}/[platform]/[creator]/[submission]
+            {trackingUrl}/[creator]/{link.submission_number}
           </code>
           <p className="text-xs text-slate-600 mb-2">Example:</p>
           <code className="block bg-white px-4 py-3 rounded-lg font-mono text-sm text-blue-600">
@@ -308,7 +311,7 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
                         {new Date(click.clicked_at).toLocaleString()}
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-900">
-                        {click.platform_name || "-"}
+                        {link.short_code}
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-900">
                         {click.creator_username || "-"}

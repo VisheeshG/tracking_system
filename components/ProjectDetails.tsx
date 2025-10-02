@@ -61,6 +61,17 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
     shortCode: string
   ) => {
     try {
+      // Get the next submission number for this project
+      const { data: existingLinks, error: countError } = await supabase
+        .from("links")
+        .select("id")
+        .eq("project_id", project.id)
+        .order("created_at", { ascending: true });
+
+      if (countError) throw countError;
+
+      const nextSubmissionNumber = `sub${(existingLinks?.length || 0) + 1}`;
+
       const { data, error } = await supabase
         .from("links")
         .insert({
@@ -68,6 +79,7 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
           title,
           destination_url: destinationUrl,
           short_code: shortCode,
+          submission_number: nextSubmissionNumber,
         })
         .select()
         .single();
@@ -292,7 +304,7 @@ function NewLinkForm({
             htmlFor="title"
             className="block text-sm font-medium text-slate-700 mb-1"
           >
-            Link Title
+            Platform Name
           </label>
           <input
             id="title"
@@ -300,9 +312,12 @@ function NewLinkForm({
             value={title}
             onChange={(e) => handleTitleChange(e.target.value)}
             className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-            placeholder="e.g., Instagram Profile, YouTube Channel"
+            placeholder="e.g., Instagram, YouTube, TikTok, Twitter"
             required
           />
+          <p className="text-xs text-slate-500 mt-1">
+            The platform name that will be tracked in analytics
+          </p>
         </div>
 
         <div>
@@ -336,7 +351,7 @@ function NewLinkForm({
             value={shortCode}
             onChange={(e) => setShortCode(e.target.value)}
             className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-            placeholder="e.g., instagram"
+            placeholder="e.g., instagram, youtube, tiktok"
             required
           />
           <p className="text-xs text-slate-500 mt-1">

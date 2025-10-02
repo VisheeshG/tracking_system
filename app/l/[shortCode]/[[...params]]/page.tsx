@@ -17,9 +17,9 @@ export default function LinkRedirectPage() {
       const shortCode = params.shortCode as string;
       const urlParams = params.params as string[] | undefined;
 
-      const platformName = urlParams?.[0] || null;
-      const creatorUsername = urlParams?.[1] || null;
-      const submissionNumber = urlParams?.[2] || null;
+      const creatorUsername = urlParams?.[0] || null;
+      const submissionNumber = urlParams?.[1] || null;
+      const platformName = shortCode; // Use short_code as platform
 
       if (!shortCode) {
         throw new Error("Invalid tracking URL");
