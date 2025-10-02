@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Link } from '@/lib/supabase';
-import { Link2, Copy, Trash2, Eye, EyeOff, ExternalLink } from 'lucide-react';
+import { useState } from "react";
+import { Link } from "@/lib/supabase";
+import { Link2, Copy, Trash2, Eye, EyeOff, ExternalLink } from "lucide-react";
 
 interface LinkListProps {
   links: Link[];
@@ -11,12 +11,21 @@ interface LinkListProps {
   onToggleActive: (linkId: string, isActive: boolean) => void;
 }
 
-export function LinkList({ links, onSelectLink, onDeleteLink, onToggleActive }: LinkListProps) {
+export function LinkList({
+  links,
+  onSelectLink,
+  onDeleteLink,
+  onToggleActive,
+}: LinkListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const handleCopy = (e: React.MouseEvent, shortCode: string, linkId: string) => {
+  const handleCopy = (
+    e: React.MouseEvent,
+    shortCode: string,
+    linkId: string
+  ) => {
     e.stopPropagation();
-    const baseUrl = window.location.origin;
+    const baseUrl = window.location.origin.replace(/^http:/, "https:");
     const trackingUrl = `${baseUrl}/l/${shortCode}`;
     navigator.clipboard.writeText(trackingUrl);
     setCopiedId(linkId);
@@ -25,12 +34,20 @@ export function LinkList({ links, onSelectLink, onDeleteLink, onToggleActive }: 
 
   const handleDelete = (e: React.MouseEvent, linkId: string) => {
     e.stopPropagation();
-    if (confirm('Are you sure you want to delete this link? This will also delete all associated analytics data.')) {
+    if (
+      confirm(
+        "Are you sure you want to delete this link? This will also delete all associated analytics data."
+      )
+    ) {
       onDeleteLink(linkId);
     }
   };
 
-  const handleToggle = (e: React.MouseEvent, linkId: string, currentState: boolean) => {
+  const handleToggle = (
+    e: React.MouseEvent,
+    linkId: string,
+    currentState: boolean
+  ) => {
     e.stopPropagation();
     onToggleActive(linkId, !currentState);
   };
@@ -80,7 +97,9 @@ export function LinkList({ links, onSelectLink, onDeleteLink, onToggleActive }: 
                   </p>
 
                   <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-slate-600">Tracking URL:</span>
+                    <span className="text-sm font-medium text-slate-600">
+                      Tracking URL:
+                    </span>
                     <code className="text-sm bg-slate-100 px-2 py-1 rounded font-mono text-slate-800">
                       /l/{link.short_code}
                     </code>
@@ -93,9 +112,13 @@ export function LinkList({ links, onSelectLink, onDeleteLink, onToggleActive }: 
               <button
                 onClick={(e) => handleToggle(e, link.id, link.is_active)}
                 className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                title={link.is_active ? 'Deactivate' : 'Activate'}
+                title={link.is_active ? "Deactivate" : "Activate"}
               >
-                {link.is_active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                {link.is_active ? (
+                  <Eye className="w-4 h-4" />
+                ) : (
+                  <EyeOff className="w-4 h-4" />
+                )}
               </button>
 
               <button
@@ -104,7 +127,9 @@ export function LinkList({ links, onSelectLink, onDeleteLink, onToggleActive }: 
                 title="Copy tracking URL"
               >
                 {copiedId === link.id ? (
-                  <span className="text-xs text-green-600 font-medium">Copied!</span>
+                  <span className="text-xs text-green-600 font-medium">
+                    Copied!
+                  </span>
                 ) : (
                   <Copy className="w-4 h-4" />
                 )}

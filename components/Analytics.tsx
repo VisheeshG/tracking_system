@@ -1,8 +1,14 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Link, LinkClick, supabase } from '@/lib/supabase';
-import { ArrowLeft, MousePointerClick, Globe, Monitor, Users } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { Link, LinkClick, supabase } from "@/lib/supabase";
+import {
+  ArrowLeft,
+  MousePointerClick,
+  Globe,
+  Monitor,
+  Users,
+} from "lucide-react";
 
 interface AnalyticsProps {
   link: Link;
@@ -40,10 +46,10 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
   const loadAnalytics = async () => {
     try {
       const { data: clicks, error } = await supabase
-        .from('link_clicks')
-        .select('*')
-        .eq('link_id', link.id)
-        .order('clicked_at', { ascending: false });
+        .from("link_clicks")
+        .select("*")
+        .eq("link_id", link.id)
+        .order("clicked_at", { ascending: false });
 
       if (error) throw error;
 
@@ -71,7 +77,8 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
 
         if (click.submission_number) {
           analyticsData.clicksBySubmission[click.submission_number] =
-            (analyticsData.clicksBySubmission[click.submission_number] || 0) + 1;
+            (analyticsData.clicksBySubmission[click.submission_number] || 0) +
+            1;
         }
 
         if (click.country) {
@@ -92,13 +99,13 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
 
       setData(analyticsData);
     } catch (error) {
-      console.error('Error loading analytics:', error);
+      console.error("Error loading analytics:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const baseUrl = window.location.origin;
+  const baseUrl = window.location.origin.replace(/^http:/, "https:");
   const trackingUrl = `${baseUrl}/l/${link.short_code}`;
   const exampleUrl = `${trackingUrl}/goc/johndoe/sub1`;
 
@@ -137,7 +144,9 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
                 </a>
               </div>
               <div className="flex items-center space-x-2">
-                <span className="text-slate-600 font-medium text-sm">Tracking URL:</span>
+                <span className="text-slate-600 font-medium text-sm">
+                  Tracking URL:
+                </span>
                 <code className="text-sm bg-slate-100 px-3 py-1 rounded font-mono text-slate-800">
                   {trackingUrl}
                 </code>
@@ -153,7 +162,9 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-600 mb-1">Total Clicks</p>
-                <p className="text-3xl font-bold text-slate-900">{data.totalClicks}</p>
+                <p className="text-3xl font-bold text-slate-900">
+                  {data.totalClicks}
+                </p>
               </div>
               <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
                 <MousePointerClick className="w-6 h-6 text-blue-600" />
@@ -205,9 +216,12 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
         </div>
 
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-8">
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">Tracking URL Format</h3>
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">
+            Tracking URL Format
+          </h3>
           <p className="text-sm text-slate-600 mb-3">
-            Use this format to track different platforms, creators, and submissions:
+            Use this format to track different platforms, creators, and
+            submissions:
           </p>
           <code className="block bg-white px-4 py-3 rounded-lg font-mono text-sm text-slate-800 mb-2">
             {trackingUrl}/[platform]/[creator]/[submission]
@@ -219,51 +233,94 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <StatsCard title="Clicks by Platform" data={data.clicksByPlatform} color="blue" />
-          <StatsCard title="Clicks by Creator" data={data.clicksByCreator} color="emerald" />
-          <StatsCard title="Clicks by Submission" data={data.clicksBySubmission} color="orange" />
-          <StatsCard title="Clicks by Country" data={data.clicksByCountry} color="cyan" />
-          <StatsCard title="Clicks by Device" data={data.clicksByDevice} color="green" />
-          <StatsCard title="Clicks by Browser" data={data.clicksByBrowser} color="slate" />
+          <StatsCard
+            title="Clicks by Platform"
+            data={data.clicksByPlatform}
+            color="blue"
+          />
+          <StatsCard
+            title="Clicks by Creator"
+            data={data.clicksByCreator}
+            color="emerald"
+          />
+          <StatsCard
+            title="Clicks by Submission"
+            data={data.clicksBySubmission}
+            color="orange"
+          />
+          <StatsCard
+            title="Clicks by Country"
+            data={data.clicksByCountry}
+            color="cyan"
+          />
+          <StatsCard
+            title="Clicks by Device"
+            data={data.clicksByDevice}
+            color="green"
+          />
+          <StatsCard
+            title="Clicks by Browser"
+            data={data.clicksByBrowser}
+            color="slate"
+          />
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent Clicks</h3>
+          <h3 className="text-lg font-semibold text-slate-900 mb-4">
+            Recent Clicks
+          </h3>
           {data.recentClicks.length === 0 ? (
-            <p className="text-slate-600 text-center py-8">No clicks recorded yet</p>
+            <p className="text-slate-600 text-center py-8">
+              No clicks recorded yet
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-200">
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Time</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Platform</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Creator</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Submission</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Country</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Device</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                      Time
+                    </th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                      Platform
+                    </th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                      Creator
+                    </th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                      Submission
+                    </th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                      Country
+                    </th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                      Device
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.recentClicks.map((click) => (
-                    <tr key={click.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <tr
+                      key={click.id}
+                      className="border-b border-slate-100 hover:bg-slate-50"
+                    >
                       <td className="py-3 px-4 text-sm text-slate-600">
                         {new Date(click.clicked_at).toLocaleString()}
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-900">
-                        {click.platform_name || '-'}
+                        {click.platform_name || "-"}
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-900">
-                        {click.creator_username || '-'}
+                        {click.creator_username || "-"}
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-900">
-                        {click.submission_number || '-'}
+                        {click.submission_number || "-"}
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-900">
-                        {click.country || '-'}
+                        {click.country || "-"}
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-900">
-                        {click.device_type || '-'}
+                        {click.device_type || "-"}
                       </td>
                     </tr>
                   ))}
@@ -277,17 +334,25 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
   );
 }
 
-function StatsCard({ title, data, color }: { title: string; data: Record<string, number>; color: string }) {
+function StatsCard({
+  title,
+  data,
+  color,
+}: {
+  title: string;
+  data: Record<string, number>;
+  color: string;
+}) {
   const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
   const total = entries.reduce((sum, [, count]) => sum + count, 0);
 
   const colorMap: Record<string, string> = {
-    blue: 'bg-blue-600',
-    emerald: 'bg-emerald-600',
-    orange: 'bg-orange-600',
-    cyan: 'bg-cyan-600',
-    green: 'bg-green-600',
-    slate: 'bg-slate-600',
+    blue: "bg-blue-600",
+    emerald: "bg-emerald-600",
+    orange: "bg-orange-600",
+    cyan: "bg-cyan-600",
+    green: "bg-green-600",
+    slate: "bg-slate-600",
   };
 
   return (
@@ -302,8 +367,12 @@ function StatsCard({ title, data, color }: { title: string; data: Record<string,
             return (
               <div key={key}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-slate-700">{key || 'Unknown'}</span>
-                  <span className="text-sm font-semibold text-slate-900">{count}</span>
+                  <span className="text-sm font-medium text-slate-700">
+                    {key || "Unknown"}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {count}
+                  </span>
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-2">
                   <div
