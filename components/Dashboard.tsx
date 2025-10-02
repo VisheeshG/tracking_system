@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase, Project } from '@/lib/supabase';
-import { ProjectList } from './ProjectList';
-import { ProjectDetails } from './ProjectDetails';
-import { LogOut, Plus, FolderOpen } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase, Project } from "@/lib/supabase";
+import { ProjectList } from "./ProjectList";
+import { ProjectDetails } from "./ProjectDetails";
+import { LogOut, Plus, FolderOpen } from "lucide-react";
 
 export function Dashboard() {
   const { user, signOut } = useAuth();
@@ -23,26 +23,30 @@ export function Dashboard() {
 
     try {
       const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .from("projects")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       setProjects(data || []);
     } catch (error) {
-      console.error('Error loading projects:', error);
+      console.error("Error loading projects:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateProject = async (name: string, description: string, slug: string) => {
+  const handleCreateProject = async (
+    name: string,
+    description: string,
+    slug: string
+  ) => {
     if (!user) return;
 
     try {
       const { data, error } = await supabase
-        .from('projects')
+        .from("projects")
         .insert({
           user_id: user.id,
           name,
@@ -57,26 +61,26 @@ export function Dashboard() {
       setProjects([data, ...projects]);
       setSelectedProject(data);
       setShowNewProject(false);
-    } catch (error: any) {
-      alert(error.message || 'Error creating project');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Error creating project");
     }
   };
 
   const handleDeleteProject = async (projectId: string) => {
     try {
       const { error } = await supabase
-        .from('projects')
+        .from("projects")
         .delete()
-        .eq('id', projectId);
+        .eq("id", projectId);
 
       if (error) throw error;
 
-      setProjects(projects.filter(p => p.id !== projectId));
+      setProjects(projects.filter((p) => p.id !== projectId));
       if (selectedProject?.id === projectId) {
         setSelectedProject(null);
       }
-    } catch (error: any) {
-      alert(error.message || 'Error deleting project');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Error deleting project");
     }
   };
 
@@ -107,7 +111,9 @@ export function Dashboard() {
                 <FolderOpen className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">Link Tracker</h1>
+                <h1 className="text-2xl font-bold text-slate-900">
+                  Link Tracker
+                </h1>
                 <p className="text-sm text-slate-600">{user?.email}</p>
               </div>
             </div>
@@ -126,7 +132,9 @@ export function Dashboard() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-3xl font-bold text-slate-900">Your Projects</h2>
+              <h2 className="text-3xl font-bold text-slate-900">
+                Your Projects
+              </h2>
               <p className="text-slate-600 mt-1">
                 Create and manage your link tracking campaigns
               </p>
@@ -151,7 +159,9 @@ export function Dashboard() {
         {projects.length === 0 ? (
           <div className="bg-white rounded-xl border-2 border-dashed border-slate-300 p-12 text-center">
             <FolderOpen className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-slate-900 mb-2">No projects yet</h3>
+            <h3 className="text-xl font-semibold text-slate-900 mb-2">
+              No projects yet
+            </h3>
             <p className="text-slate-600 mb-6">
               Create your first project to start tracking links
             </p>
@@ -182,15 +192,15 @@ function NewProjectForm({
   onSubmit: (name: string, description: string, slug: string) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [slug, setSlug] = useState('');
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [slug, setSlug] = useState("");
 
   const generateSlug = (text: string) => {
     return text
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
   };
 
   const handleNameChange = (value: string) => {
@@ -206,12 +216,20 @@ function NewProjectForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">Create New Project</h3>
+    <form
+      onSubmit={handleSubmit}
+      className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6"
+    >
+      <h3 className="text-lg font-semibold text-slate-900 mb-4">
+        Create New Project
+      </h3>
 
       <div className="space-y-4">
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-1">
+          <label
+            htmlFor="name"
+            className="block text-sm font-medium text-slate-700 mb-1"
+          >
             Project Name
           </label>
           <input
@@ -226,7 +244,10 @@ function NewProjectForm({
         </div>
 
         <div>
-          <label htmlFor="slug" className="block text-sm font-medium text-slate-700 mb-1">
+          <label
+            htmlFor="slug"
+            className="block text-sm font-medium text-slate-700 mb-1"
+          >
             Project Slug
           </label>
           <input
@@ -244,7 +265,10 @@ function NewProjectForm({
         </div>
 
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-slate-700 mb-1">
+          <label
+            htmlFor="description"
+            className="block text-sm font-medium text-slate-700 mb-1"
+          >
             Description (Optional)
           </label>
           <textarea
