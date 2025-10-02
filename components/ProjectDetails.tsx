@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Project, Link, supabase } from "@/lib/supabase";
 import {
   ArrowLeft,
@@ -8,7 +8,6 @@ import {
   Link2,
   TrendingUp,
   MousePointerClick,
-  Globe,
 } from "lucide-react";
 import { LinkList } from "./LinkList";
 import { Analytics } from "./Analytics";
@@ -25,11 +24,7 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
   const [loading, setLoading] = useState(true);
   const [totalClicks, setTotalClicks] = useState(0);
 
-  useEffect(() => {
-    loadLinks();
-  }, [project]);
-
-  const loadLinks = async () => {
+  const loadLinks = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("links")
@@ -54,7 +49,11 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [project]);
+
+  useEffect(() => {
+    loadLinks();
+  }, [loadLinks]);
 
   const handleCreateLink = async (
     title: string,
