@@ -1,10 +1,17 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Project, Link, supabase } from '@/lib/supabase';
-import { ArrowLeft, Plus, Link2, TrendingUp, MousePointerClick, Globe } from 'lucide-react';
-import { LinkList } from './LinkList';
-import { Analytics } from './Analytics';
+import { useState, useEffect } from "react";
+import { Project, Link, supabase } from "@/lib/supabase";
+import {
+  ArrowLeft,
+  Plus,
+  Link2,
+  TrendingUp,
+  MousePointerClick,
+  Globe,
+} from "lucide-react";
+import { LinkList } from "./LinkList";
+import { Analytics } from "./Analytics";
 
 interface ProjectDetailsProps {
   project: Project;
@@ -25,34 +32,38 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
   const loadLinks = async () => {
     try {
       const { data, error } = await supabase
-        .from('links')
-        .select('*')
-        .eq('project_id', project.id)
-        .order('created_at', { ascending: false });
+        .from("links")
+        .select("*")
+        .eq("project_id", project.id)
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       setLinks(data || []);
 
       if (data && data.length > 0) {
-        const linkIds = data.map(l => l.id);
+        const linkIds = data.map((l) => l.id);
         const { count } = await supabase
-          .from('link_clicks')
-          .select('*', { count: 'exact', head: true })
-          .in('link_id', linkIds);
+          .from("link_clicks")
+          .select("*", { count: "exact", head: true })
+          .in("link_id", linkIds);
 
         setTotalClicks(count || 0);
       }
     } catch (error) {
-      console.error('Error loading links:', error);
+      console.error("Error loading links:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateLink = async (title: string, destinationUrl: string, shortCode: string) => {
+  const handleCreateLink = async (
+    title: string,
+    destinationUrl: string,
+    shortCode: string
+  ) => {
     try {
       const { data, error } = await supabase
-        .from('links')
+        .from("links")
         .insert({
           project_id: project.id,
           title,
@@ -66,50 +77,46 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
 
       setLinks([data, ...links]);
       setShowNewLink(false);
-    } catch (error: any) {
-      alert(error.message || 'Error creating link');
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : "Error creating link");
     }
   };
 
   const handleDeleteLink = async (linkId: string) => {
     try {
-      const { error } = await supabase
-        .from('links')
-        .delete()
-        .eq('id', linkId);
+      const { error } = await supabase.from("links").delete().eq("id", linkId);
 
       if (error) throw error;
 
-      setLinks(links.filter(l => l.id !== linkId));
+      setLinks(links.filter((l) => l.id !== linkId));
       if (selectedLink?.id === linkId) {
         setSelectedLink(null);
       }
-    } catch (error: any) {
-      alert(error.message || 'Error deleting link');
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : "Error deleting link");
     }
   };
 
   const handleToggleActive = async (linkId: string, isActive: boolean) => {
     try {
       const { error } = await supabase
-        .from('links')
+        .from("links")
         .update({ is_active: isActive })
-        .eq('id', linkId);
+        .eq("id", linkId);
 
       if (error) throw error;
 
-      setLinks(links.map(l => l.id === linkId ? { ...l, is_active: isActive } : l));
-    } catch (error: any) {
-      alert(error.message || 'Error updating link');
+      setLinks(
+        links.map((l) => (l.id === linkId ? { ...l, is_active: isActive } : l))
+      );
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : "Error updating link");
     }
   };
 
   if (selectedLink) {
     return (
-      <Analytics
-        link={selectedLink}
-        onBack={() => setSelectedLink(null)}
-      />
+      <Analytics link={selectedLink} onBack={() => setSelectedLink(null)} />
     );
   }
 
@@ -127,7 +134,9 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
 
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900">{project.name}</h1>
+              <h1 className="text-3xl font-bold text-slate-900">
+                {project.name}
+              </h1>
               {project.description && (
                 <p className="text-slate-600 mt-2">{project.description}</p>
               )}
@@ -145,7 +154,9 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-600 mb-1">Total Links</p>
-                <p className="text-3xl font-bold text-slate-900">{links.length}</p>
+                <p className="text-3xl font-bold text-slate-900">
+                  {links.length}
+                </p>
               </div>
               <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
                 <Link2 className="w-6 h-6 text-blue-600" />
@@ -157,7 +168,9 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-600 mb-1">Total Clicks</p>
-                <p className="text-3xl font-bold text-slate-900">{totalClicks}</p>
+                <p className="text-3xl font-bold text-slate-900">
+                  {totalClicks}
+                </p>
               </div>
               <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
                 <MousePointerClick className="w-6 h-6 text-green-600" />
@@ -170,7 +183,7 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
               <div>
                 <p className="text-sm text-slate-600 mb-1">Active Links</p>
                 <p className="text-3xl font-bold text-slate-900">
-                  {links.filter(l => l.is_active).length}
+                  {links.filter((l) => l.is_active).length}
                 </p>
               </div>
               <div className="w-12 h-12 bg-emerald-50 rounded-lg flex items-center justify-center">
@@ -201,11 +214,15 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-slate-600">Loading links...</div>
+          <div className="text-center py-12 text-slate-600">
+            Loading links...
+          </div>
         ) : links.length === 0 ? (
           <div className="bg-white rounded-xl border-2 border-dashed border-slate-300 p-12 text-center">
             <Link2 className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-slate-900 mb-2">No links yet</h3>
+            <h3 className="text-xl font-semibold text-slate-900 mb-2">
+              No links yet
+            </h3>
             <p className="text-slate-600 mb-6">
               Create your first trackable link for this project
             </p>
@@ -237,15 +254,15 @@ function NewLinkForm({
   onSubmit: (title: string, destinationUrl: string, shortCode: string) => void;
   onCancel: () => void;
 }) {
-  const [title, setTitle] = useState('');
-  const [destinationUrl, setDestinationUrl] = useState('');
-  const [shortCode, setShortCode] = useState('');
+  const [title, setTitle] = useState("");
+  const [destinationUrl, setDestinationUrl] = useState("");
+  const [shortCode, setShortCode] = useState("");
 
   const generateShortCode = (text: string) => {
     return text
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
       .substring(0, 20);
   };
 
@@ -262,12 +279,20 @@ function NewLinkForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">Create New Link</h3>
+    <form
+      onSubmit={handleSubmit}
+      className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6"
+    >
+      <h3 className="text-lg font-semibold text-slate-900 mb-4">
+        Create New Link
+      </h3>
 
       <div className="space-y-4">
         <div>
-          <label htmlFor="title" className="block text-sm font-medium text-slate-700 mb-1">
+          <label
+            htmlFor="title"
+            className="block text-sm font-medium text-slate-700 mb-1"
+          >
             Link Title
           </label>
           <input
@@ -282,7 +307,10 @@ function NewLinkForm({
         </div>
 
         <div>
-          <label htmlFor="destinationUrl" className="block text-sm font-medium text-slate-700 mb-1">
+          <label
+            htmlFor="destinationUrl"
+            className="block text-sm font-medium text-slate-700 mb-1"
+          >
             Destination URL
           </label>
           <input
@@ -297,7 +325,10 @@ function NewLinkForm({
         </div>
 
         <div>
-          <label htmlFor="shortCode" className="block text-sm font-medium text-slate-700 mb-1">
+          <label
+            htmlFor="shortCode"
+            className="block text-sm font-medium text-slate-700 mb-1"
+          >
             Short Code
           </label>
           <input
