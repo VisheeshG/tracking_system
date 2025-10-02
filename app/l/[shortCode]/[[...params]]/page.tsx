@@ -76,7 +76,7 @@ export default function LinkRedirectPage() {
           geoCity = geo?.city || null;
           ipAddress = geo?.ip || null;
         }
-      } catch (e) {
+      } catch {
         // Ignore geo errors; proceed without country
       }
 

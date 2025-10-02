@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase, Project } from "@/lib/supabase";
 import { ProjectList } from "./ProjectList";
@@ -14,11 +14,7 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showNewProject, setShowNewProject] = useState(false);
 
-  useEffect(() => {
-    loadProjects();
-  }, [user]);
-
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -35,7 +31,11 @@ export function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadProjects();
+  }, [user, loadProjects]);
 
   const handleCreateProject = async (
     name: string,
@@ -61,7 +61,7 @@ export function Dashboard() {
       setProjects([data, ...projects]);
       setSelectedProject(data);
       setShowNewProject(false);
-    } catch (error) {
+    } catch (error: unknown) {
       alert(error instanceof Error ? error.message : "Error creating project");
     }
   };
@@ -79,7 +79,7 @@ export function Dashboard() {
       if (selectedProject?.id === projectId) {
         setSelectedProject(null);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       alert(error instanceof Error ? error.message : "Error deleting project");
     }
   };
