@@ -34,7 +34,6 @@ export type Link = {
   destination_url: string;
   short_code: string;
   title: string;
-  is_active: boolean;
   submission_number: string | null;
   created_at: string;
   updated_at: string;

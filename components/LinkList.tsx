@@ -2,21 +2,15 @@
 
 import { useState } from "react";
 import { Link } from "@/lib/supabase";
-import { Link2, Copy, Trash2, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { Link2, Copy, Trash2, ExternalLink } from "lucide-react";
 
 interface LinkListProps {
   links: Link[];
   onSelectLink: (link: Link) => void;
   onDeleteLink: (linkId: string) => void;
-  onToggleActive: (linkId: string, isActive: boolean) => void;
 }
 
-export function LinkList({
-  links,
-  onSelectLink,
-  onDeleteLink,
-  onToggleActive,
-}: LinkListProps) {
+export function LinkList({ links, onSelectLink, onDeleteLink }: LinkListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleCopy = (
@@ -43,15 +37,6 @@ export function LinkList({
     }
   };
 
-  const handleToggle = (
-    e: React.MouseEvent,
-    linkId: string,
-    currentState: boolean
-  ) => {
-    e.stopPropagation();
-    onToggleActive(linkId, !currentState);
-  };
-
   return (
     <div className="space-y-4">
       {links.map((link) => (
@@ -74,15 +59,9 @@ export function LinkList({
                   {/* <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
                     Platform
                   </span> */}
-                  {link.is_active ? (
-                    <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">
-                      Active
-                    </span>
-                  ) : (
-                    <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full font-medium">
-                      Inactive
-                    </span>
-                  )}
+                  {/* <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">
+                    Active
+                  </span> */}
                 </div>
 
                 <div className="space-y-1">
@@ -123,18 +102,6 @@ export function LinkList({
             </div>
 
             <div className="flex items-center space-x-2 ml-4">
-              <button
-                onClick={(e) => handleToggle(e, link.id, link.is_active)}
-                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                title={link.is_active ? "Deactivate" : "Activate"}
-              >
-                {link.is_active ? (
-                  <Eye className="w-4 h-4" />
-                ) : (
-                  <EyeOff className="w-4 h-4" />
-                )}
-              </button>
-
               <button
                 onClick={(e) => handleCopy(e, link.short_code, link.id)}
                 className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"

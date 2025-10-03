@@ -30,7 +30,6 @@
   - `destination_url` (text) - Original URL to redirect to
   - `short_code` (text, unique) - Short identifier for the link
   - `title` (text) - Link title/description
-  - `is_active` (boolean) - Whether link is active
   - `created_at` (timestamptz) - Link creation timestamp
   - `updated_at` (timestamptz) - Last update timestamp
 
@@ -144,7 +143,6 @@ CREATE TABLE IF NOT EXISTS links (
   destination_url text NOT NULL,
   short_code text UNIQUE NOT NULL,
   title text NOT NULL,
-  is_active boolean DEFAULT true,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
@@ -202,11 +200,11 @@ CREATE POLICY "Users can delete own project links"
     )
   );
 
--- Allow anonymous users to view active links for redirects
-CREATE POLICY "Anyone can view active links"
+-- Allow anonymous users to view all links for redirects
+CREATE POLICY "Anyone can view all links"
   ON links FOR SELECT
   TO anon
-  USING (is_active = true);
+  WITH CHECK (true);
 
 -- Create index on link short codes
 CREATE INDEX IF NOT EXISTS idx_links_short_code ON links(short_code);

@@ -66,6 +66,14 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
         "Countries found:",
         clicks?.map((c) => ({ id: c.id, country: c.country, city: c.city }))
       );
+      console.log(
+        "Timestamps found:",
+        clicks?.map((c) => ({
+          id: c.id,
+          clicked_at: c.clicked_at,
+          type: typeof c.clicked_at,
+        }))
+      );
 
       clicks?.forEach((click) => {
         // Use short_code as platform for analytics
@@ -326,7 +334,11 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
                       className="border-b border-slate-100 hover:bg-slate-50"
                     >
                       <td className="py-3 px-4 text-sm text-slate-600">
-                        {new Date(click.clicked_at).toLocaleString()}
+                        {click.clicked_at ? (
+                          new Date(click.clicked_at).toLocaleDateString("en-GB")
+                        ) : (
+                          <span className="text-red-500">No timestamp</span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-900">
                         {link.short_code}

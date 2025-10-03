@@ -29,13 +29,12 @@ export default function LinkRedirectPage() {
         .from("links")
         .select("*")
         .eq("short_code", shortCode)
-        .eq("is_active", true)
         .maybeSingle();
 
       if (error) throw error;
 
       if (!link) {
-        throw new Error("Link not found or inactive");
+        throw new Error("Link not found");
       }
 
       const userAgent = navigator.userAgent;
@@ -122,7 +121,7 @@ export default function LinkRedirectPage() {
         console.warn("No country data obtained from any geolocation API");
       }
 
-      await supabase.from("link_clicks").insert({
+      const clickData = {
         link_id: link.id,
         platform_name: platformName,
         creator_username: creatorUsername,
@@ -135,7 +134,22 @@ export default function LinkRedirectPage() {
         country: geoCountry,
         city: geoCity,
         ip_address: ipAddress,
-      });
+        clicked_at: new Date().toISOString(),
+      };
+
+      console.log("Inserting click data:", clickData);
+
+      const { data: insertData, error: insertError } = await supabase
+        .from("link_clicks")
+        .insert(clickData)
+        .select();
+
+      if (insertError) {
+        console.error("Error inserting click data:", insertError);
+        throw insertError;
+      }
+
+      console.log("Click data inserted successfully:", insertData);
 
       setStatus("redirecting");
       window.location.href = link.destination_url;

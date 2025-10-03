@@ -108,23 +108,6 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
     }
   };
 
-  const handleToggleActive = async (linkId: string, isActive: boolean) => {
-    try {
-      const { error } = await supabase
-        .from("links")
-        .update({ is_active: isActive })
-        .eq("id", linkId);
-
-      if (error) throw error;
-
-      setLinks(
-        links.map((l) => (l.id === linkId ? { ...l, is_active: isActive } : l))
-      );
-    } catch (error: unknown) {
-      alert(error instanceof Error ? error.message : "Error updating link");
-    }
-  };
-
   if (selectedLink) {
     return (
       <Analytics link={selectedLink} onBack={() => setSelectedLink(null)} />
@@ -194,7 +177,7 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
               <div>
                 <p className="text-sm text-slate-600 mb-1">Active Links</p>
                 <p className="text-3xl font-bold text-slate-900">
-                  {links.filter((l) => l.is_active).length}
+                  {links.length}
                 </p>
               </div>
               <div className="w-12 h-12 bg-emerald-50 rounded-lg flex items-center justify-center">
@@ -250,7 +233,6 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
             links={links}
             onSelectLink={setSelectedLink}
             onDeleteLink={handleDeleteLink}
-            onToggleActive={handleToggleActive}
           />
         )}
       </div>
