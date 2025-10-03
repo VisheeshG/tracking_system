@@ -60,6 +60,13 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
         recentClicks: clicks?.slice(0, 10) || [],
       };
 
+      // Debug: Log raw click data to see what's being stored
+      console.log("Raw clicks data:", clicks);
+      console.log(
+        "Countries found:",
+        clicks?.map((c) => ({ id: c.id, country: c.country, city: c.city }))
+      );
+
       clicks?.forEach((click) => {
         // Use short_code as platform for analytics
         const platformName = click.platform_name || link.short_code;
@@ -80,6 +87,14 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
         if (click.country) {
           analyticsData.clicksByCountry[click.country] =
             (analyticsData.clicksByCountry[click.country] || 0) + 1;
+        } else {
+          // Debug: Log clicks without country data
+          console.log("Click without country data:", {
+            id: click.id,
+            country: click.country,
+            city: click.city,
+            clicked_at: click.clicked_at,
+          });
         }
 
         if (click.device_type) {
@@ -92,6 +107,9 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
             (analyticsData.clicksByBrowser[click.browser] || 0) + 1;
         }
       });
+
+      // Debug: Log final analytics data
+      console.log("Analytics data:", analyticsData);
 
       setData(analyticsData);
     } catch (error) {

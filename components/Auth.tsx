@@ -10,7 +10,6 @@ export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [companyName, setCompanyName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -29,7 +28,7 @@ export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
 
     try {
       if (isSignUp) {
-        const { error } = await signUp(email, password, fullName, companyName);
+        const { error } = await signUp(email, password, fullName);
         if (error) throw error;
         // Ensure no active session after signup so user sees login
         await signOut();
@@ -87,22 +86,6 @@ export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
                     onChange={(e) => setFullName(e.target.value)}
                     className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
                     required
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="companyName"
-                    className="block text-sm font-medium text-slate-700 mb-1"
-                  >
-                    Company Name (Optional)
-                  </label>
-                  <input
-                    id="companyName"
-                    type="text"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
                   />
                 </div>
               </>

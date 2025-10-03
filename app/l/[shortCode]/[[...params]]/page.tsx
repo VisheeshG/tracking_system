@@ -59,25 +59,67 @@ export default function LinkRedirectPage() {
       else if (userAgent.includes("iOS")) os = "iOS";
 
       // Best-effort geolocation lookup for country/city
-      // Uses a public geolocation API with a short timeout to avoid delaying redirect
+      // Uses multiple geolocation APIs with fallbacks
       let geoCountry: string | null = null;
       let geoCity: string | null = null;
       let ipAddress: string | null = null;
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1500);
-        const res = await fetch("https://ipapi.co/json/", {
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        if (res.ok) {
-          const geo = await res.json();
-          geoCountry = geo?.country_name || geo?.country || null;
-          geoCity = geo?.city || null;
-          ipAddress = geo?.ip || null;
+
+      // Try multiple geolocation services for better reliability
+      const geoApis = [
+        "https://ipapi.co/json/",
+        "https://ip-api.com/json/",
+        "https://api.ipify.org?format=json",
+      ];
+
+      for (const apiUrl of geoApis) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 2000);
+          const res = await fetch(apiUrl, {
+            signal: controller.signal,
+            headers: {
+              Accept: "application/json",
+            },
+          });
+          clearTimeout(timeoutId);
+
+          if (res.ok) {
+            const geo = await res.json();
+
+            // Handle different API response formats
+            if (apiUrl.includes("ipapi.co")) {
+              geoCountry = geo?.country_name || geo?.country || null;
+              geoCity = geo?.city || null;
+              ipAddress = geo?.ip || null;
+            } else if (apiUrl.includes("ip-api.com")) {
+              geoCountry = geo?.country || null;
+              geoCity = geo?.city || null;
+              ipAddress = geo?.query || null;
+            } else if (apiUrl.includes("ipify.org")) {
+              // ipify only provides IP, use it as fallback
+              ipAddress = geo?.ip || null;
+            }
+
+            // If we got country data, break out of the loop
+            if (geoCountry) {
+              console.log("Geolocation success:", {
+                geoCountry,
+                geoCity,
+                ipAddress,
+                api: apiUrl,
+              });
+              break;
+            }
+          }
+        } catch (error) {
+          console.warn(`Geolocation API failed (${apiUrl}):`, error);
+          // Continue to next API
         }
-      } catch {
-        // Ignore geo errors; proceed without country
+      }
+
+      // Log if no country data was obtained
+      if (!geoCountry) {
+        console.warn("No country data obtained from any geolocation API");
       }
 
       await supabase.from("link_clicks").insert({
