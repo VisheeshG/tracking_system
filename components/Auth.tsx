@@ -1,35 +1,48 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { LogIn, UserPlus } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { LogIn, UserPlus } from "lucide-react";
 
-export function Auth() {
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [companyName, setCompanyName] = useState('');
-  const [error, setError] = useState('');
+export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
+  const [isSignUp, setIsSignUp] = useState(mode === "signup");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const { signUp, signIn } = useAuth();
+  const router = useRouter();
+  const { signUp, signIn, signOut } = useAuth();
+
+  useEffect(() => {
+    // Keep local state in sync if parent changes mode prop
+    setIsSignUp(mode === "signup");
+  }, [mode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
       if (isSignUp) {
         const { error } = await signUp(email, password, fullName, companyName);
         if (error) throw error;
-      } else {
-        const { error } = await signIn(email, password);
-        if (error) throw error;
+        // Ensure no active session after signup so user sees login
+        await signOut();
+        router.replace("/?from=signup");
+        return;
       }
+
+      const { error } = await signIn(email, password);
+      if (error) throw error;
+      // After successful login, navigate to dashboard
+      router.push("/dashboard");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
@@ -48,12 +61,12 @@ export function Auth() {
               )}
             </div>
             <h1 className="text-3xl font-bold text-slate-900">
-              {isSignUp ? 'Create Account' : 'Welcome Back'}
+              {isSignUp ? "Create Account" : "Welcome Back"}
             </h1>
             <p className="text-slate-600 mt-2">
               {isSignUp
-                ? 'Start tracking your links today'
-                : 'Sign in to your account'}
+                ? "Start tracking your links today"
+                : "Sign in to your account"}
             </p>
           </div>
 
@@ -61,7 +74,10 @@ export function Auth() {
             {isSignUp && (
               <>
                 <div>
-                  <label htmlFor="fullName" className="block text-sm font-medium text-slate-700 mb-1">
+                  <label
+                    htmlFor="fullName"
+                    className="block text-sm font-medium text-slate-700 mb-1"
+                  >
                     Full Name
                   </label>
                   <input
@@ -75,7 +91,10 @@ export function Auth() {
                 </div>
 
                 <div>
-                  <label htmlFor="companyName" className="block text-sm font-medium text-slate-700 mb-1">
+                  <label
+                    htmlFor="companyName"
+                    className="block text-sm font-medium text-slate-700 mb-1"
+                  >
                     Company Name (Optional)
                   </label>
                   <input
@@ -90,7 +109,10 @@ export function Auth() {
             )}
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-slate-700 mb-1"
+              >
                 Email
               </label>
               <input
@@ -104,7 +126,10 @@ export function Auth() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-slate-700 mb-1"
+              >
                 Password
               </label>
               <input
@@ -129,22 +154,40 @@ export function Auth() {
               disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Processing...' : isSignUp ? 'Create Account' : 'Sign In'}
+              {loading
+                ? "Processing..."
+                : isSignUp
+                ? "Create Account"
+                : "Sign In"}
             </button>
           </form>
 
           <div className="mt-6 text-center">
-            <button
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setError('');
-              }}
-              className="text-blue-600 hover:text-blue-700 font-medium text-sm"
-            >
-              {isSignUp
-                ? 'Already have an account? Sign in'
-                : "Don't have an account? Sign up"}
-            </button>
+            {isSignUp ? (
+              <button
+                onClick={() => {
+                  setIsSignUp(false);
+                  setError("");
+                  // Navigate to login route for clarity
+                  router.push("/");
+                }}
+                className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+              >
+                Already have an account? Sign in
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setIsSignUp(true);
+                  setError("");
+                  // Navigate to signup route
+                  router.push("/signup");
+                }}
+                className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+              >
+                Don&apos;t have an account? Sign up
+              </button>
+            )}
           </div>
         </div>
       </div>

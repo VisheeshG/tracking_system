@@ -1,11 +1,22 @@
-'use client';
+"use client";
 
-import { useAuth } from '@/contexts/AuthContext';
-import { Auth } from '@/components/Auth';
-import { Dashboard } from '@/components/Dashboard';
+import { useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { Auth } from "@/components/Auth";
 
-export default function HomePage() {
+export default function LoginPage() {
   const { user, loading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (loading) return;
+    const from = searchParams.get("from");
+    if (user && from !== "signup") {
+      router.replace("/dashboard");
+    }
+  }, [loading, user, router, searchParams]);
 
   if (loading) {
     return (
@@ -15,9 +26,5 @@ export default function HomePage() {
     );
   }
 
-  if (!user) {
-    return <Auth />;
-  }
-
-  return <Dashboard />;
+  return <Auth mode="signin" />;
 }

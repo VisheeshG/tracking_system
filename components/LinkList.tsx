@@ -71,9 +71,9 @@ export function LinkList({
                   <h3 className="text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition">
                     {link.title}
                   </h3>
-                  <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
+                  {/* <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
                     Platform
-                  </span>
+                  </span> */}
                   {link.is_active ? (
                     <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">
                       Active
