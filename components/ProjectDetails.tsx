@@ -110,7 +110,11 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
 
   if (selectedLink) {
     return (
-      <Analytics link={selectedLink} onBack={() => setSelectedLink(null)} />
+      <Analytics
+        link={selectedLink}
+        onBack={() => setSelectedLink(null)}
+        projectSlug={project.slug}
+      />
     );
   }
 
@@ -233,6 +237,7 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
             links={links}
             onSelectLink={setSelectedLink}
             onDeleteLink={handleDeleteLink}
+            projectSlug={project.slug}
           />
         )}
       </div>

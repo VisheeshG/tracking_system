@@ -8,9 +8,15 @@ interface LinkListProps {
   links: Link[];
   onSelectLink: (link: Link) => void;
   onDeleteLink: (linkId: string) => void;
+  projectSlug: string;
 }
 
-export function LinkList({ links, onSelectLink, onDeleteLink }: LinkListProps) {
+export function LinkList({
+  links,
+  onSelectLink,
+  onDeleteLink,
+  projectSlug,
+}: LinkListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleCopy = (
@@ -20,7 +26,7 @@ export function LinkList({ links, onSelectLink, onDeleteLink }: LinkListProps) {
   ) => {
     e.stopPropagation();
     const baseUrl = window.location.origin;
-    const trackingUrl = `${baseUrl}/l/${shortCode}`;
+    const trackingUrl = `${baseUrl}/${projectSlug}/${shortCode}/[creator]/[submission]`;
     navigator.clipboard.writeText(trackingUrl);
     setCopiedId(linkId);
     setTimeout(() => setCopiedId(null), 2000);
@@ -83,7 +89,7 @@ export function LinkList({ links, onSelectLink, onDeleteLink }: LinkListProps) {
                       Tracking URL:
                     </span>
                     <code className="text-sm bg-slate-100 px-2 py-1 rounded font-mono text-slate-800">
-                      /l/{link.short_code}
+                      /{projectSlug}/{link.short_code}/[creator]/[submission]
                     </code>
                   </div> */}
 

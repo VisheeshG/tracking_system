@@ -13,6 +13,7 @@ import {
 interface AnalyticsProps {
   link: Link;
   onBack: () => void;
+  projectSlug: string;
 }
 
 interface AnalyticsData {
@@ -26,7 +27,7 @@ interface AnalyticsData {
   recentClicks: LinkClick[];
 }
 
-export function Analytics({ link, onBack }: AnalyticsProps) {
+export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
   const [data, setData] = useState<AnalyticsData>({
     totalClicks: 0,
     clicksByPlatform: {},
@@ -63,16 +64,16 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
       // Debug: Log raw click data to see what's being stored
       console.log("Raw clicks data:", clicks);
       console.log(
-        "Countries found:",
-        clicks?.map((c) => ({ id: c.id, country: c.country, city: c.city }))
-      );
-      console.log(
         "Timestamps found:",
         clicks?.map((c) => ({
           id: c.id,
           clicked_at: c.clicked_at,
           type: typeof c.clicked_at,
         }))
+      );
+      console.log(
+        "Countries found:",
+        clicks?.map((c) => ({ id: c.id, country: c.country, city: c.city }))
       );
 
       clicks?.forEach((click) => {
@@ -132,7 +133,7 @@ export function Analytics({ link, onBack }: AnalyticsProps) {
   }, [link, loadAnalytics]);
 
   const baseUrl = window.location.origin;
-  const trackingUrl = `${baseUrl}/l/${link.short_code}`;
+  const trackingUrl = `${baseUrl}/${projectSlug}/${link.short_code}`;
   const exampleUrl = `${trackingUrl}/johndoe/sub1`;
 
   if (loading) {
