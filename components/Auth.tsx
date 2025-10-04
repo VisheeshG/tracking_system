@@ -38,8 +38,8 @@ export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
 
       const { error } = await signIn(email, password);
       if (error) throw error;
-      // After successful login, navigate to dashboard
-      router.push("/dashboard");
+      // After successful login, navigate to dashboard without leaving login in history
+      router.replace("/dashboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {

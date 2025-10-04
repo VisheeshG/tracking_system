@@ -78,14 +78,14 @@ export function LinkList({ links, onSelectLink, onDeleteLink }: LinkListProps) {
                     </a>
                   </p>
 
-                  <div className="flex items-center space-x-2">
+                  {/* <div className="flex items-center space-x-2">
                     <span className="text-sm font-medium text-slate-600">
                       Tracking URL:
                     </span>
                     <code className="text-sm bg-slate-100 px-2 py-1 rounded font-mono text-slate-800">
                       /l/{link.short_code}
                     </code>
-                  </div>
+                  </div> */}
 
                   {link.submission_number && (
                     <div className="flex items-center space-x-2">
