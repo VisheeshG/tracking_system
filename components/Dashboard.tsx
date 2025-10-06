@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase, Project } from "@/lib/supabase";
 import { ProjectList } from "./ProjectList";
-import { ProjectDetails } from "./ProjectDetails";
+import { generateUniqueProjectSlug } from "@/lib/generators";
 import { LogOut, Plus, FolderOpen } from "lucide-react";
 
 export function Dashboard() {
   const { user, signOut } = useAuth();
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [showNewProject, setShowNewProject] = useState(false);
 
@@ -37,6 +38,18 @@ export function Dashboard() {
     loadProjects();
   }, [user, loadProjects]);
 
+  // Close the New Project modal on Escape key
+  useEffect(() => {
+    if (!showNewProject) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowNewProject(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showNewProject]);
+
   const handleCreateProject = async (
     name: string,
     description: string,
@@ -59,8 +72,9 @@ export function Dashboard() {
       if (error) throw error;
 
       setProjects([data, ...projects]);
-      setSelectedProject(data);
       setShowNewProject(false);
+      // Navigate to the new project
+      router.push(`/dashboard/${data.id}`);
     } catch (error: unknown) {
       alert(error instanceof Error ? error.message : "Error creating project");
     }
@@ -76,9 +90,6 @@ export function Dashboard() {
       if (error) throw error;
 
       setProjects(projects.filter((p) => p.id !== projectId));
-      if (selectedProject?.id === projectId) {
-        setSelectedProject(null);
-      }
     } catch (error: unknown) {
       alert(error instanceof Error ? error.message : "Error deleting project");
     }
@@ -92,14 +103,9 @@ export function Dashboard() {
     );
   }
 
-  if (selectedProject) {
-    return (
-      <ProjectDetails
-        project={selectedProject}
-        onBack={() => setSelectedProject(null)}
-      />
-    );
-  }
+  const handleSelectProject = (project: Project) => {
+    router.push(`/dashboard/${project.id}`);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -140,20 +146,13 @@ export function Dashboard() {
               </p>
             </div>
             <button
-              onClick={() => setShowNewProject(!showNewProject)}
+              onClick={() => setShowNewProject(true)}
               className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg transition font-medium"
             >
               <Plus className="w-5 h-5" />
               <span>New Project</span>
             </button>
           </div>
-
-          {showNewProject && (
-            <NewProjectForm
-              onSubmit={handleCreateProject}
-              onCancel={() => setShowNewProject(false)}
-            />
-          )}
         </div>
 
         {projects.length === 0 ? (
@@ -176,11 +175,26 @@ export function Dashboard() {
         ) : (
           <ProjectList
             projects={projects}
-            onSelectProject={setSelectedProject}
+            onSelectProject={handleSelectProject}
             onDeleteProject={handleDeleteProject}
           />
         )}
       </main>
+
+      {showNewProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowNewProject(false)}
+          />
+          <div className="relative z-10 w-full max-w-lg mx-4">
+            <NewProjectForm
+              onSubmit={handleCreateProject}
+              onCancel={() => setShowNewProject(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -195,20 +209,50 @@ function NewProjectForm({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [slug, setSlug] = useState("");
+  const [isGeneratingSlug, setIsGeneratingSlug] = useState(false);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const generateSlug = (text: string) => {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
+  const handleGenerateSlug = async () => {
+    setIsGeneratingSlug(true);
+    try {
+      const randomSlug = await generateUniqueProjectSlug(supabase);
+      setSlug(randomSlug);
+    } catch (error) {
+      console.error("Error generating slug:", error);
+    } finally {
+      setIsGeneratingSlug(false);
+    }
   };
 
   const handleNameChange = (value: string) => {
     setName(value);
-    if (!slug || slug === generateSlug(name)) {
-      setSlug(generateSlug(value));
+
+    // Clear existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    // Auto-generate slug when name changes (with debounce)
+    if (value.trim()) {
+      debounceTimeoutRef.current = setTimeout(async () => {
+        try {
+          const autoSlug = await generateUniqueProjectSlug(supabase);
+          setSlug(autoSlug);
+        } catch (error) {
+          console.error("Error auto-generating slug:", error);
+        }
+      }, 500); // 500ms debounce
     }
   };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -250,17 +294,29 @@ function NewProjectForm({
           >
             Project Slug
           </label>
-          <input
-            id="slug"
-            type="text"
-            value={slug}
-            onChange={(e) => setSlug(e.target.value)}
-            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-            placeholder="e.g., website-campaign"
-            required
-          />
+          <div className="flex space-x-2">
+            <input
+              id="slug"
+              type="text"
+              value={slug}
+              readOnly
+              className="flex-1 px-4 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed"
+              placeholder="Auto-generated letter"
+              required
+            />
+            <button
+              type="button"
+              onClick={handleGenerateSlug}
+              disabled={isGeneratingSlug}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isGeneratingSlug ? "..." : "New"}
+            </button>
+          </div>
           <p className="text-xs text-slate-500 mt-1">
-            Used in URLs. Only lowercase letters, numbers, and hyphens.
+            Auto-generated single letter when you type a project name. Click
+            &quot;New&quot; for a fresh random letter. This field cannot be
+            edited.
           </p>
         </div>
 

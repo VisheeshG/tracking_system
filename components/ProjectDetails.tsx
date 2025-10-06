@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Project, Link, supabase } from "@/lib/supabase";
 import {
   ArrowLeft,
@@ -11,18 +12,22 @@ import {
 } from "lucide-react";
 import { LinkList } from "./LinkList";
 import { Analytics } from "./Analytics";
+import { SocialShare } from "./SocialShare";
+import { generateUniqueShortCode } from "@/lib/generators";
 
 interface ProjectDetailsProps {
   project: Project;
-  onBack: () => void;
 }
 
-export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
+export function ProjectDetails({ project }: ProjectDetailsProps) {
   const [links, setLinks] = useState<Link[]>([]);
   const [selectedLink, setSelectedLink] = useState<Link | null>(null);
   const [showNewLink, setShowNewLink] = useState(false);
   const [loading, setLoading] = useState(true);
   const [totalClicks, setTotalClicks] = useState(0);
+  const [projectUrl, setProjectUrl] = useState("");
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const loadLinks = useCallback(async () => {
     try {
@@ -53,7 +58,46 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
 
   useEffect(() => {
     loadLinks();
-  }, [loadLinks]);
+    // Set the project URL for sharing
+    setProjectUrl(`${window.location.origin}/dashboard/${project.id}`);
+  }, [loadLinks, project.id]);
+
+  useEffect(() => {
+    if (!links.length) return;
+    // Support two formats:
+    // 1) ?link_id=<uuid>
+    // 2) ?<uuid> (id-only query key with empty value)
+    const linkIdFromQuery = searchParams.get("link_id");
+    let resolvedId: string | null = linkIdFromQuery;
+
+    if (!resolvedId) {
+      const entries = Array.from(searchParams.entries());
+      if (entries.length === 1) {
+        const [firstKey, value] = entries[0];
+        if (value === "") {
+          resolvedId = firstKey;
+        }
+      }
+    }
+
+    if (!resolvedId) return;
+    const match = links.find((l) => l.id === resolvedId);
+    if (match) {
+      setSelectedLink(match);
+    }
+  }, [links, searchParams]);
+
+  // Close the New Link modal on Escape key
+  useEffect(() => {
+    if (!showNewLink) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowNewLink(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showNewLink]);
 
   const handleCreateLink = async (
     title: string,
@@ -93,6 +137,12 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
     }
   };
 
+  const handleSelectLink = (link: Link) => {
+    setSelectedLink(link);
+    // Write the URL as ?<id> (id-only, no key)
+    router.push(`?${link.id}`);
+  };
+
   const handleDeleteLink = async (linkId: string) => {
     try {
       const { error } = await supabase.from("links").delete().eq("id", linkId);
@@ -112,7 +162,20 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
     return (
       <Analytics
         link={selectedLink}
-        onBack={() => setSelectedLink(null)}
+        onBack={() => {
+          setSelectedLink(null);
+          // Remove either ?link_id=<id> or ?<id> from the URL
+          const params = new URLSearchParams(
+            Array.from(searchParams.entries())
+          );
+          params.delete("link_id");
+          // Also delete the id-only key if present
+          if (selectedLink?.id) {
+            params.delete(selectedLink.id);
+          }
+          const qs = params.toString();
+          router.replace(qs ? `?${qs}` : `/dashboard/${project.id}`);
+        }}
         projectSlug={project.slug}
       />
     );
@@ -123,7 +186,7 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <button
-            onClick={onBack}
+            onClick={() => router.push("/dashboard")}
             className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 mb-4 transition"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -138,9 +201,17 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
               {project.description && (
                 <p className="text-slate-600 mt-2">{project.description}</p>
               )}
-              <span className="inline-block mt-2 px-3 py-1 bg-slate-100 text-slate-700 text-sm rounded-full font-mono">
+              {/* <span className="inline-block mt-2 px-3 py-1 bg-slate-100 text-slate-700 text-sm rounded-full font-mono">
                 {project.slug}
-              </span>
+              </span> */}
+            </div>
+            <div className="flex items-center space-x-3">
+              <SocialShare
+                projectName={project.name}
+                projectDescription={project.description || undefined}
+                projectUrl={projectUrl}
+                className="mt-2"
+              />
             </div>
           </div>
         </div>
@@ -202,13 +273,6 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
               <span>New Link</span>
             </button>
           </div>
-
-          {showNewLink && (
-            <NewLinkForm
-              onSubmit={handleCreateLink}
-              onCancel={() => setShowNewLink(false)}
-            />
-          )}
         </div>
 
         {loading ? (
@@ -235,12 +299,27 @@ export function ProjectDetails({ project, onBack }: ProjectDetailsProps) {
         ) : (
           <LinkList
             links={links}
-            onSelectLink={setSelectedLink}
+            onSelectLink={handleSelectLink}
             onDeleteLink={handleDeleteLink}
             projectSlug={project.slug}
           />
         )}
       </div>
+
+      {showNewLink && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowNewLink(false)}
+          />
+          <div className="relative z-10 w-full max-w-lg mx-4">
+            <NewLinkForm
+              onSubmit={handleCreateLink}
+              onCancel={() => setShowNewLink(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -255,21 +334,50 @@ function NewLinkForm({
   const [title, setTitle] = useState("");
   const [destinationUrl, setDestinationUrl] = useState("");
   const [shortCode, setShortCode] = useState("");
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const generateShortCode = (text: string) => {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-      .substring(0, 20);
+  const handleGenerateShortCode = async () => {
+    setIsGeneratingCode(true);
+    try {
+      const randomCode = await generateUniqueShortCode(supabase);
+      setShortCode(randomCode);
+    } catch (error) {
+      console.error("Error generating short code:", error);
+    } finally {
+      setIsGeneratingCode(false);
+    }
   };
 
   const handleTitleChange = (value: string) => {
     setTitle(value);
-    if (!shortCode || shortCode === generateShortCode(title)) {
-      setShortCode(generateShortCode(value));
+
+    // Clear existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    // Auto-generate short code when title changes (with debounce)
+    if (value.trim()) {
+      debounceTimeoutRef.current = setTimeout(async () => {
+        try {
+          const autoCode = await generateUniqueShortCode(supabase);
+          setShortCode(autoCode);
+        } catch (error) {
+          console.error("Error auto-generating short code:", error);
+        }
+      }, 500); // 500ms debounce
     }
   };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -332,17 +440,28 @@ function NewLinkForm({
           >
             Short Code
           </label>
-          <input
-            id="shortCode"
-            type="text"
-            value={shortCode}
-            onChange={(e) => setShortCode(e.target.value)}
-            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-            placeholder="e.g., instagram, youtube, tiktok"
-            required
-          />
+          <div className="flex space-x-2">
+            <input
+              id="shortCode"
+              type="text"
+              value={shortCode}
+              readOnly
+              className="flex-1 px-4 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed"
+              placeholder="Auto-generated code"
+              required
+            />
+            <button
+              type="button"
+              onClick={handleGenerateShortCode}
+              disabled={isGeneratingCode}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isGeneratingCode ? "..." : "New"}
+            </button>
+          </div>
           <p className="text-xs text-slate-500 mt-1">
-            Used in tracking URLs. Only lowercase letters, numbers, and hyphens.
+            Auto-generated when you type a platform name. Click &quot;New&quot;
+            for a fresh random code. This field cannot be edited.
           </p>
         </div>
       </div>

@@ -77,8 +77,8 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
       );
 
       clicks?.forEach((click) => {
-        // Use short_code as platform for analytics
-        const platformName = click.platform_name || link.short_code;
+        // Use platform name (link.title) for analytics
+        const platformName = link.title;
         analyticsData.clicksByPlatform[platformName] =
           (analyticsData.clicksByPlatform[platformName] || 0) + 1;
 
@@ -134,7 +134,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
 
   const baseUrl = window.location.origin;
   const trackingUrl = `${baseUrl}/${projectSlug}/${link.short_code}`;
-  const exampleUrl = `${trackingUrl}/johndoe/sub1`;
+  const exampleUrl = `${trackingUrl}/johndoe/${link.submission_number}`;
 
   if (loading) {
     return (
@@ -159,7 +159,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
           <div>
             <h1 className="text-3xl font-bold text-slate-900">{link.title}</h1>
             <p className="text-sm text-slate-600 mt-1">
-              Analytics for Platform: {link.short_code}
+              Analytics for Platform: {link.title}
             </p>
             <div className="mt-3 space-y-2">
               <div className="flex items-center space-x-2 text-sm">
@@ -173,14 +173,14 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
                   {link.destination_url}
                 </a>
               </div>
-              <div className="flex items-center space-x-2">
+              {/* <div className="flex items-center space-x-2">
                 <span className="text-slate-600 font-medium text-sm">
                   Tracking URL:
                 </span>
                 <code className="text-sm bg-slate-100 px-3 py-1 rounded font-mono text-slate-800">
                   {trackingUrl}
                 </code>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>
@@ -342,7 +342,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
                         )}
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-900">
-                        {link.short_code}
+                        {link.title}
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-900">
                         {click.creator_username || "-"}

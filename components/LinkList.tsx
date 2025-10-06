@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "@/lib/supabase";
 import { Link2, Copy, Trash2, ExternalLink } from "lucide-react";
 
@@ -18,6 +18,12 @@ export function LinkList({
   projectSlug,
 }: LinkListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [baseUrl, setBaseUrl] = useState("");
+
+  // Set base URL on component mount
+  useEffect(() => {
+    setBaseUrl(window.location.origin);
+  }, []);
 
   const handleCopy = (
     e: React.MouseEvent,
@@ -25,7 +31,6 @@ export function LinkList({
     linkId: string
   ) => {
     e.stopPropagation();
-    const baseUrl = window.location.origin;
     const trackingUrl = `${baseUrl}/${projectSlug}/${shortCode}/[creator]/[submission]`;
     navigator.clipboard.writeText(trackingUrl);
     setCopiedId(linkId);

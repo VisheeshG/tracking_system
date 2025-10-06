@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { Project } from '@/lib/supabase';
-import { FolderOpen, Trash2, ExternalLink } from 'lucide-react';
+import { Project } from "@/lib/supabase";
+import { FolderOpen, Trash2, ExternalLink } from "lucide-react";
 
 interface ProjectListProps {
   projects: Project[];
@@ -9,10 +9,18 @@ interface ProjectListProps {
   onDeleteProject: (projectId: string) => void;
 }
 
-export function ProjectList({ projects, onSelectProject, onDeleteProject }: ProjectListProps) {
+export function ProjectList({
+  projects,
+  onSelectProject,
+  onDeleteProject,
+}: ProjectListProps) {
   const handleDelete = (e: React.MouseEvent, projectId: string) => {
     e.stopPropagation();
-    if (confirm('Are you sure you want to delete this project? This will also delete all associated links and analytics data.')) {
+    if (
+      confirm(
+        "Are you sure you want to delete this project? This will also delete all associated links and analytics data."
+      )
+    ) {
       onDeleteProject(projectId);
     }
   };
@@ -48,8 +56,8 @@ export function ProjectList({ projects, onSelectProject, onDeleteProject }: Proj
           )}
 
           <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-            <span className="text-xs text-slate-500 font-mono">{project.slug}</span>
-            <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition" />
+            {/* <span className="text-xs text-slate-500 font-mono">{project.slug}</span> */}
+            {/* <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition" /> */}
           </div>
         </div>
       ))}
