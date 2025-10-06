@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Project, Link, supabase } from "@/lib/supabase";
 import {
@@ -19,7 +19,7 @@ interface ProjectDetailsProps {
   project: Project;
 }
 
-export function ProjectDetails({ project }: ProjectDetailsProps) {
+function ProjectDetailsContent({ project }: ProjectDetailsProps) {
   const [links, setLinks] = useState<Link[]>([]);
   const [selectedLink, setSelectedLink] = useState<Link | null>(null);
   const [showNewLink, setShowNewLink] = useState(false);
@@ -321,6 +321,20 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
         </div>
       )}
     </div>
+  );
+}
+
+export function ProjectDetails({ project }: ProjectDetailsProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+          <div className="text-slate-600">Loading...</div>
+        </div>
+      }
+    >
+      <ProjectDetailsContent project={project} />
+    </Suspense>
   );
 }
 

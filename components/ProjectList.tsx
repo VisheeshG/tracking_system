@@ -1,7 +1,7 @@
 "use client";
 
 import { Project } from "@/lib/supabase";
-import { FolderOpen, Trash2, ExternalLink } from "lucide-react";
+import { FolderOpen, Trash2 } from "lucide-react";
 
 interface ProjectListProps {
   projects: Project[];
