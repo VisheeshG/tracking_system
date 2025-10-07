@@ -85,12 +85,12 @@ export default function PublicProjectPage() {
           <p className="text-gray-600 mb-4">
             {error || "The requested project could not be found."}
           </p>
-          <button
+          {/* <button
             onClick={() => router.push("/")}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
           >
             Go Home
-          </button>
+          </button> */}
         </div>
       </div>
     );

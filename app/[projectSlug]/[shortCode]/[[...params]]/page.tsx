@@ -156,12 +156,12 @@ export default function TrackingPage() {
             Link Not Found
           </h1>
           <p className="text-gray-600 mb-4">{error}</p>
-          <button
+          {/* <button
             onClick={() => router.push("/")}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
           >
             Go Home
-          </button>
+          </button> */}
         </div>
       </div>
     );
