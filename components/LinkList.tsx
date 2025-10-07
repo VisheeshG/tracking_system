@@ -9,6 +9,8 @@ interface LinkListProps {
   onSelectLink: (link: Link) => void;
   onDeleteLink: (linkId: string) => void;
   projectSlug: string;
+  readOnly?: boolean;
+  enableSelectInReadOnly?: boolean;
 }
 
 export function LinkList({
@@ -16,6 +18,8 @@ export function LinkList({
   onSelectLink,
   onDeleteLink,
   projectSlug,
+  readOnly = false,
+  enableSelectInReadOnly = false,
 }: LinkListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [baseUrl, setBaseUrl] = useState("");
@@ -28,10 +32,11 @@ export function LinkList({
   const handleCopy = (
     e: React.MouseEvent,
     shortCode: string,
-    linkId: string
+    linkId: string,
+    submissionNumber: string
   ) => {
     e.stopPropagation();
-    const trackingUrl = `${baseUrl}/${projectSlug}/${shortCode}/[creator]/[submission]`;
+    const trackingUrl = `${baseUrl}/${projectSlug}/${shortCode}/[creator]/${submissionNumber}`;
     navigator.clipboard.writeText(trackingUrl);
     setCopiedId(linkId);
     setTimeout(() => setCopiedId(null), 2000);
@@ -53,8 +58,16 @@ export function LinkList({
       {links.map((link) => (
         <div
           key={link.id}
-          onClick={() => onSelectLink(link)}
-          className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-blue-300 transition cursor-pointer group"
+          onClick={() => {
+            if (!readOnly || enableSelectInReadOnly) {
+              onSelectLink(link);
+            }
+          }}
+          className={`bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-blue-300 transition group ${
+            readOnly && !enableSelectInReadOnly
+              ? "cursor-default"
+              : "cursor-pointer"
+          }`}
         >
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-start space-x-4 flex-1">
@@ -114,7 +127,14 @@ export function LinkList({
 
             <div className="flex items-center space-x-2 ml-4">
               <button
-                onClick={(e) => handleCopy(e, link.short_code, link.id)}
+                onClick={(e) =>
+                  handleCopy(
+                    e,
+                    link.short_code,
+                    link.id,
+                    link.submission_number || ""
+                  )
+                }
                 className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
                 title="Copy tracking URL"
               >
@@ -127,13 +147,15 @@ export function LinkList({
                 )}
               </button>
 
-              <button
-                onClick={(e) => handleDelete(e, link.id)}
-                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                title="Delete link"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={(e) => handleDelete(e, link.id)}
+                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                  title="Delete link"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -141,10 +163,12 @@ export function LinkList({
             <span className="text-xs text-slate-500">
               Created {new Date(link.created_at).toLocaleDateString()}
             </span>
-            <div className="flex items-center space-x-2 text-blue-600 text-sm font-medium opacity-0 group-hover:opacity-100 transition">
-              <span>View Analytics</span>
-              <ExternalLink className="w-4 h-4" />
-            </div>
+            {!readOnly && (
+              <div className="flex items-center space-x-2 text-blue-600 text-sm font-medium opacity-0 group-hover:opacity-100 transition">
+                <span>View Analytics</span>
+                <ExternalLink className="w-4 h-4" />
+              </div>
+            )}
           </div>
         </div>
       ))}

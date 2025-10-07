@@ -129,3 +129,45 @@ export async function generateUniqueShortCode(
   // Fallback: add timestamp to make it unique
   return generateRandomShortCode() + Date.now().toString().slice(-2);
 }
+
+/**
+ * Generate a unique project-level short code that can be shared across all links in a project
+ * @param supabase - Supabase client
+ * @param projectId - The project ID to generate a short code for
+ * @param maxAttempts - Maximum attempts to generate unique short code (default: 10)
+ * @returns Promise<string> - Unique project-level short code
+ */
+export async function generateUniqueProjectShortCode(
+  supabase: SupabaseClient,
+  projectId: string,
+  maxAttempts: number = 10
+): Promise<string> {
+  // First, check if this project already has a short code
+  const { data: existingLinks, error } = await supabase
+    .from("links")
+    .select("short_code")
+    .eq("project_id", projectId)
+    .limit(1);
+
+  if (error) {
+    console.error("Error checking existing project short code:", error);
+  }
+
+  // If project already has links with a short code, return that short code
+  if (existingLinks && existingLinks.length > 0) {
+    return existingLinks[0].short_code;
+  }
+
+  // Generate a new unique short code for this project
+  for (let i = 0; i < maxAttempts; i++) {
+    const shortCode = generateRandomShortCode();
+    const isUnique = await isShortCodeUnique(shortCode, supabase);
+
+    if (isUnique) {
+      return shortCode;
+    }
+  }
+
+  // Fallback: add timestamp to make it unique
+  return generateRandomShortCode() + Date.now().toString().slice(-2);
+}

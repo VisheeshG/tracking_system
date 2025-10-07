@@ -17,8 +17,25 @@ export default function ProjectPage() {
   const projectId = params.projectId as string;
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.replace("/");
+    if (!loading && !user && projectId) {
+      (async () => {
+        try {
+          // If not authenticated, redirect to public project slug page
+          const { data: publicProject } = await supabase
+            .from("projects")
+            .select("slug")
+            .eq("id", projectId)
+            .single();
+
+          if (publicProject?.slug) {
+            router.replace(`/${publicProject.slug}`);
+          } else {
+            router.replace("/");
+          }
+        } catch {
+          router.replace("/");
+        }
+      })();
     }
   }, [loading, user, router]);
 

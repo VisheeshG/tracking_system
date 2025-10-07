@@ -58,11 +58,30 @@ export function Dashboard() {
     if (!user) return;
 
     try {
+      // Prevent duplicate project names per user (case-insensitive)
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        alert("Project name is required");
+        return;
+      }
+
+      const { data: existingProjects, error: existingError } = await supabase
+        .from("projects")
+        .select("id")
+        .eq("user_id", user.id)
+        .ilike("name", trimmedName);
+
+      if (existingError) throw existingError;
+      if (existingProjects && existingProjects.length > 0) {
+        alert("A project with this name already exists.");
+        return;
+      }
+
       const { data, error } = await supabase
         .from("projects")
         .insert({
           user_id: user.id,
-          name,
+          name: trimmedName,
           description,
           slug,
         })

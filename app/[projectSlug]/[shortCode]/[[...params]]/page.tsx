@@ -25,16 +25,16 @@ export default function TrackingPage() {
         setLoading(true);
         setError(null);
 
-        // URL structure: /{projectSlug}/{platformName}/{creator}/{submission}
-        // So shortCode is actually the platform name
-        const platformName = shortCode;
+        // URL structure: /{projectSlug}/{shortCode}/{creator}/{submission}
+        // The shortCode is shared across all links in a project
+        // The submission number identifies which specific link to redirect to
         const additionalParams = (params.params as string[]) || [];
         const creatorUsername = additionalParams[0] || null;
         const submissionNumber = additionalParams[1] || null;
 
         console.log("URL params:", {
           projectSlug,
-          platformName,
+          shortCode,
           creatorUsername,
           submissionNumber,
         });
@@ -55,11 +55,14 @@ export default function TrackingPage() {
           return;
         }
 
-        // Then, get the link by platform name (short_code) and project_id
+        // Then, get the link by submission_number and project_id
+        // The submission number uniquely identifies which link to redirect to
         const { data: linkData, error: linkError } = await supabase
           .from("links")
-          .select("id, destination_url, short_code, project_id")
-          .eq("short_code", platformName)
+          .select(
+            "id, destination_url, short_code, project_id, title, submission_number"
+          )
+          .eq("submission_number", submissionNumber)
           .eq("project_id", projectData.id)
           .single();
 
@@ -67,7 +70,7 @@ export default function TrackingPage() {
           console.error("Link query error:", linkError);
           console.error("Link data:", linkData);
           console.error("Query params:", {
-            platformName,
+            shortCode,
             projectSlug,
             projectId: projectData.id,
           });
@@ -100,7 +103,7 @@ export default function TrackingPage() {
           .from("link_clicks")
           .insert({
             link_id: linkData.id,
-            platform_name: platformName,
+            platform_name: linkData.title, // Use the link title as platform name
             creator_username: creatorUsername,
             submission_number: submissionNumber,
             user_agent: userAgent,

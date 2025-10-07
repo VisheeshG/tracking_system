@@ -13,7 +13,7 @@ import {
 import { LinkList } from "./LinkList";
 import { Analytics } from "./Analytics";
 import { SocialShare } from "./SocialShare";
-import { generateUniqueShortCode } from "@/lib/generators";
+import { generateUniqueProjectShortCode } from "@/lib/generators";
 
 interface ProjectDetailsProps {
   project: Project;
@@ -58,9 +58,9 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
 
   useEffect(() => {
     loadLinks();
-    // Set the project URL for sharing
-    setProjectUrl(`${window.location.origin}/dashboard/${project.id}`);
-  }, [loadLinks, project.id]);
+    // Set the project URL for sharing (public view by slug)
+    setProjectUrl(`${window.location.origin}/${project.slug}`);
+  }, [loadLinks, project.id, project.slug]);
 
   useEffect(() => {
     if (!links.length) return;
@@ -316,6 +316,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
             <NewLinkForm
               onSubmit={handleCreateLink}
               onCancel={() => setShowNewLink(false)}
+              projectId={project.id}
             />
           </div>
         </div>
@@ -341,27 +342,16 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
 function NewLinkForm({
   onSubmit,
   onCancel,
+  projectId,
 }: {
   onSubmit: (title: string, destinationUrl: string, shortCode: string) => void;
   onCancel: () => void;
+  projectId: string;
 }) {
   const [title, setTitle] = useState("");
   const [destinationUrl, setDestinationUrl] = useState("");
   const [shortCode, setShortCode] = useState("");
-  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleGenerateShortCode = async () => {
-    setIsGeneratingCode(true);
-    try {
-      const randomCode = await generateUniqueShortCode(supabase);
-      setShortCode(randomCode);
-    } catch (error) {
-      console.error("Error generating short code:", error);
-    } finally {
-      setIsGeneratingCode(false);
-    }
-  };
 
   const handleTitleChange = (value: string) => {
     setTitle(value);
@@ -375,8 +365,11 @@ function NewLinkForm({
     if (value.trim()) {
       debounceTimeoutRef.current = setTimeout(async () => {
         try {
-          const autoCode = await generateUniqueShortCode(supabase);
-          setShortCode(autoCode);
+          const projectCode = await generateUniqueProjectShortCode(
+            supabase,
+            projectId
+          );
+          setShortCode(projectCode);
         } catch (error) {
           console.error("Error auto-generating short code:", error);
         }
@@ -454,28 +447,19 @@ function NewLinkForm({
           >
             Short Code
           </label>
-          <div className="flex space-x-2">
-            <input
-              id="shortCode"
-              type="text"
-              value={shortCode}
-              readOnly
-              className="flex-1 px-4 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed"
-              placeholder="Auto-generated code"
-              required
-            />
-            <button
-              type="button"
-              onClick={handleGenerateShortCode}
-              disabled={isGeneratingCode}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isGeneratingCode ? "..." : "New"}
-            </button>
-          </div>
+          <input
+            id="shortCode"
+            type="text"
+            value={shortCode}
+            readOnly
+            className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed"
+            placeholder="Auto-generated code"
+            required
+          />
           <p className="text-xs text-slate-500 mt-1">
-            Auto-generated when you type a platform name. Click &quot;New&quot;
-            for a fresh random code. This field cannot be edited.
+            Auto-generated when you type a platform name. This short code will
+            be shared across all links in this project. This field cannot be
+            edited.
           </p>
         </div>
       </div>
