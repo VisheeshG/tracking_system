@@ -101,7 +101,7 @@ export default function DebugPage() {
                     className="border border-gray-200 rounded p-4"
                   >
                     <div className="font-medium text-gray-900">
-                      {link.title}
+                      {link.link_title}
                     </div>
                     <div className="text-sm text-gray-600">
                       Short Code: {link.short_code}

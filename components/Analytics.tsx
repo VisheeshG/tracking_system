@@ -77,8 +77,8 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
       );
 
       clicks?.forEach((click) => {
-        // Use platform name (link.title) for analytics
-        const platformName = link.title;
+        // Use platform name for analytics
+        const platformName = link.platform;
         analyticsData.clicksByPlatform[platformName] =
           (analyticsData.clicksByPlatform[platformName] || 0) + 1;
 
@@ -157,9 +157,11 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
           </button>
 
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">{link.title}</h1>
+            <h1 className="text-3xl font-bold text-slate-900">
+              {link.link_title}
+            </h1>
             <p className="text-sm text-slate-600 mt-1">
-              Analytics for Platform: {link.title}
+              Analytics for Platform: {link.platform}
             </p>
             <div className="mt-3 space-y-2">
               <div className="flex items-center space-x-2 text-sm">
@@ -342,7 +344,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
                         )}
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-900">
-                        {link.title}
+                        {link.platform}
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-900">
                         {click.creator_username || "-"}

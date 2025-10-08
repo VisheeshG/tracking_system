@@ -100,11 +100,31 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
   }, [showNewLink]);
 
   const handleCreateLink = async (
-    title: string,
+    linkTitle: string,
+    platform: string,
     destinationUrl: string,
     shortCode: string
   ) => {
     try {
+      // Check if destination URL already exists in this project
+      const { data: existingUrl, error: urlCheckError } = await supabase
+        .from("links")
+        .select("id, destination_url, link_title")
+        .eq("project_id", project.id)
+        .eq("destination_url", destinationUrl)
+        .single();
+
+      if (urlCheckError && urlCheckError.code !== "PGRST116") {
+        throw urlCheckError;
+      }
+
+      if (existingUrl) {
+        alert(
+          `This destination URL already exists in this project as "${existingUrl.link_title}". Please use a different URL.`
+        );
+        return;
+      }
+
       // Get the next submission number for this project
       const { data: existingLinks, error: countError } = await supabase
         .from("links")
@@ -120,7 +140,8 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
         .from("links")
         .insert({
           project_id: project.id,
-          title,
+          link_title: linkTitle,
+          platform,
           destination_url: destinationUrl,
           short_code: shortCode,
           submission_number: nextSubmissionNumber,
@@ -344,24 +365,30 @@ function NewLinkForm({
   onCancel,
   projectId,
 }: {
-  onSubmit: (title: string, destinationUrl: string, shortCode: string) => void;
+  onSubmit: (
+    linkTitle: string,
+    platform: string,
+    destinationUrl: string,
+    shortCode: string
+  ) => void;
   onCancel: () => void;
   projectId: string;
 }) {
-  const [title, setTitle] = useState("");
+  const [linkTitle, setLinkTitle] = useState("");
+  const [platform, setPlatform] = useState("");
   const [destinationUrl, setDestinationUrl] = useState("");
   const [shortCode, setShortCode] = useState("");
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleTitleChange = (value: string) => {
-    setTitle(value);
+  const handlePlatformChange = (value: string) => {
+    setPlatform(value);
 
     // Clear existing timeout
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
 
-    // Auto-generate short code when title changes (with debounce)
+    // Auto-generate short code when platform changes (with debounce)
     if (value.trim()) {
       debounceTimeoutRef.current = setTimeout(async () => {
         try {
@@ -388,7 +415,7 @@ function NewLinkForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(title, destinationUrl, shortCode);
+    onSubmit(linkTitle, platform, destinationUrl, shortCode);
   };
 
   return (
@@ -403,16 +430,37 @@ function NewLinkForm({
       <div className="space-y-4">
         <div>
           <label
-            htmlFor="title"
+            htmlFor="linkTitle"
+            className="block text-sm font-medium text-slate-700 mb-1"
+          >
+            Link Title
+          </label>
+          <input
+            id="linkTitle"
+            type="text"
+            value={linkTitle}
+            onChange={(e) => setLinkTitle(e.target.value)}
+            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            placeholder="title"
+            required
+          />
+          <p className="text-xs text-slate-500 mt-1">
+            A descriptive title for this link
+          </p>
+        </div>
+
+        <div>
+          <label
+            htmlFor="platform"
             className="block text-sm font-medium text-slate-700 mb-1"
           >
             Platform Name
           </label>
           <input
-            id="title"
+            id="platform"
             type="text"
-            value={title}
-            onChange={(e) => handleTitleChange(e.target.value)}
+            value={platform}
+            onChange={(e) => handlePlatformChange(e.target.value)}
             className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             placeholder="e.g., Instagram, YouTube, TikTok, Twitter"
             required

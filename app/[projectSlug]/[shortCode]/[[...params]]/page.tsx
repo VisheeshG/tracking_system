@@ -60,7 +60,7 @@ export default function TrackingPage() {
         const { data: linkData, error: linkError } = await supabase
           .from("links")
           .select(
-            "id, destination_url, short_code, project_id, title, submission_number"
+            "id, destination_url, short_code, project_id, link_title, platform, submission_number"
           )
           .eq("submission_number", submissionNumber)
           .eq("project_id", projectData.id)
@@ -103,7 +103,7 @@ export default function TrackingPage() {
           .from("link_clicks")
           .insert({
             link_id: linkData.id,
-            platform_name: linkData.title, // Use the link title as platform name
+            platform_name: linkData.platform, // Use the platform name for tracking
             creator_username: creatorUsername,
             submission_number: submissionNumber,
             user_agent: userAgent,

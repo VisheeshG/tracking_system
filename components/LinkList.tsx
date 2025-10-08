@@ -78,14 +78,11 @@ export function LinkList({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-2 mb-2">
                   <h3 className="text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition">
-                    {link.title}
+                    {link.link_title}
                   </h3>
-                  {/* <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
-                    Platform
-                  </span> */}
-                  {/* <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">
-                    Active
-                  </span> */}
+                  <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
+                    {link.platform}
+                  </span>
                 </div>
 
                 <div className="space-y-1">

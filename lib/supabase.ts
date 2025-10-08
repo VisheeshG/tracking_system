@@ -33,7 +33,8 @@ export type Link = {
   project_id: string;
   destination_url: string;
   short_code: string;
-  title: string;
+  link_title: string;
+  platform: string;
   submission_number: string | null;
   created_at: string;
   updated_at: string;
