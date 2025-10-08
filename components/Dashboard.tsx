@@ -55,14 +55,14 @@ export function Dashboard() {
     description: string,
     slug: string
   ) => {
-    if (!user) return;
+    if (!user) return false;
 
     try {
       // Prevent duplicate project names per user (case-insensitive)
       const trimmedName = name.trim();
       if (!trimmedName) {
         alert("Project name is required");
-        return;
+        return false;
       }
 
       const { data: existingProjects, error: existingError } = await supabase
@@ -74,7 +74,7 @@ export function Dashboard() {
       if (existingError) throw existingError;
       if (existingProjects && existingProjects.length > 0) {
         alert("A project with this name already exists.");
-        return;
+        return false;
       }
 
       const { data, error } = await supabase
@@ -94,8 +94,10 @@ export function Dashboard() {
       setShowNewProject(false);
       // Navigate to the new project
       router.push(`/dashboard/${data.id}`);
+      return true;
     } catch (error: unknown) {
       alert(error instanceof Error ? error.message : "Error creating project");
+      return false;
     }
   };
 
@@ -222,13 +224,18 @@ function NewProjectForm({
   onSubmit,
   onCancel,
 }: {
-  onSubmit: (name: string, description: string, slug: string) => void;
+  onSubmit: (
+    name: string,
+    description: string,
+    slug: string
+  ) => Promise<boolean>;
   onCancel: () => void;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [slug, setSlug] = useState("");
   const [isGeneratingSlug, setIsGeneratingSlug] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleGenerateSlug = async () => {
@@ -273,9 +280,16 @@ function NewProjectForm({
     };
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(name, description, slug);
+    if (isSubmitting) return; // Prevent duplicate submissions
+
+    setIsSubmitting(true);
+    try {
+      await onSubmit(name, description, slug);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -360,14 +374,16 @@ function NewProjectForm({
       <div className="flex space-x-3 mt-6">
         <button
           type="submit"
-          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition font-medium"
+          disabled={isSubmitting}
+          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition font-medium disabled:bg-blue-400 disabled:cursor-not-allowed"
         >
-          Create Project
+          {isSubmitting ? "Creating..." : "Create Project"}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg transition font-medium"
+          disabled={isSubmitting}
+          className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg transition font-medium disabled:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
         >
           Cancel
         </button>
