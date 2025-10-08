@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { LogIn, UserPlus } from "lucide-react";
+import toast from "react-hot-toast";
 
 export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
   const [isSignUp, setIsSignUp] = useState(mode === "signup");
@@ -30,14 +31,28 @@ export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
       if (isSignUp) {
         const { error } = await signUp(email, password, fullName);
         if (error) throw error;
+
+        // Show success toast
+        toast.success("Account created successfully! Please sign in.", {
+          duration: 4000,
+        });
+
         // Ensure no active session after signup so user sees login
         await signOut();
-        router.replace("/?from=signup");
+        // Wait a bit for auth state to clear before redirecting
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        router.push("/");
         return;
       }
 
       const { error } = await signIn(email, password);
       if (error) throw error;
+
+      // Show success toast
+      toast.success("Welcome back! Logged in successfully.", {
+        duration: 3000,
+      });
+
       // After successful login, navigate to dashboard without leaving login in history
       router.replace("/dashboard");
     } catch (err: unknown) {

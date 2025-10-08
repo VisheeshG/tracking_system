@@ -7,6 +7,7 @@ import { supabase, Project } from "@/lib/supabase";
 import { ProjectList } from "./ProjectList";
 import { generateUniqueProjectSlug } from "@/lib/generators";
 import { LogOut, Plus, FolderOpen } from "lucide-react";
+import toast from "react-hot-toast";
 
 export function Dashboard() {
   const { user, signOut } = useAuth();
@@ -61,7 +62,7 @@ export function Dashboard() {
       // Prevent duplicate project names per user (case-insensitive)
       const trimmedName = name.trim();
       if (!trimmedName) {
-        alert("Project name is required");
+        toast.error("Project name is required");
         return false;
       }
 
@@ -73,7 +74,7 @@ export function Dashboard() {
 
       if (existingError) throw existingError;
       if (existingProjects && existingProjects.length > 0) {
-        alert("A project with this name already exists.");
+        toast.error("A project with this name already exists.");
         return false;
       }
 
@@ -96,7 +97,9 @@ export function Dashboard() {
       router.push(`/dashboard/${data.id}`);
       return true;
     } catch (error: unknown) {
-      alert(error instanceof Error ? error.message : "Error creating project");
+      toast.error(
+        error instanceof Error ? error.message : "Error creating project"
+      );
       return false;
     }
   };
@@ -112,7 +115,9 @@ export function Dashboard() {
 
       setProjects(projects.filter((p) => p.id !== projectId));
     } catch (error: unknown) {
-      alert(error instanceof Error ? error.message : "Error deleting project");
+      toast.error(
+        error instanceof Error ? error.message : "Error deleting project"
+      );
     }
   };
 
@@ -283,6 +288,14 @@ function NewProjectForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return; // Prevent duplicate submissions
+
+    // Validate that slug is not empty
+    if (!slug.trim()) {
+      toast.error(
+        "Please wait for the project slug to be generated before submitting."
+      );
+      return;
+    }
 
     setIsSubmitting(true);
     try {

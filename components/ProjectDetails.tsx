@@ -14,6 +14,7 @@ import { LinkList } from "./LinkList";
 import { Analytics } from "./Analytics";
 import { SocialShare } from "./SocialShare";
 import { generateUniqueProjectShortCode } from "@/lib/generators";
+import toast from "react-hot-toast";
 
 interface ProjectDetailsProps {
   project: Project;
@@ -119,7 +120,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
       }
 
       if (existingUrl) {
-        alert(
+        toast.error(
           `This destination URL already exists in this project as "${existingUrl.link_title}". Please use a different URL.`
         );
         return false;
@@ -155,7 +156,9 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
       setShowNewLink(false);
       return true;
     } catch (error: unknown) {
-      alert(error instanceof Error ? error.message : "Error creating link");
+      toast.error(
+        error instanceof Error ? error.message : "Error creating link"
+      );
       return false;
     }
   };
@@ -177,7 +180,9 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
         setSelectedLink(null);
       }
     } catch (error: unknown) {
-      alert(error instanceof Error ? error.message : "Error deleting link");
+      toast.error(
+        error instanceof Error ? error.message : "Error deleting link"
+      );
     }
   };
 
@@ -419,6 +424,14 @@ function NewLinkForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return; // Prevent duplicate submissions
+
+    // Validate that shortCode is not empty
+    if (!shortCode.trim()) {
+      toast.error(
+        "Please wait for the short code to be generated before submitting."
+      );
+      return;
+    }
 
     setIsSubmitting(true);
     try {

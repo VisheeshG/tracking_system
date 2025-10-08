@@ -1,22 +1,20 @@
 "use client";
 
 import { useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Auth } from "@/components/Auth";
 
 function LoginPageContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
     if (loading) return;
-    const from = searchParams.get("from");
-    if (user && from !== "signup") {
+    if (user) {
       router.replace("/dashboard");
     }
-  }, [loading, user, router, searchParams]);
+  }, [loading, user, router]);
 
   if (loading) {
     return (
