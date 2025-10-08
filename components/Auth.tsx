@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { LogIn, UserPlus } from "lucide-react";
+import { LogIn, UserPlus, Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
 
 export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
@@ -13,6 +13,7 @@ export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const router = useRouter();
   const { signUp, signIn, signOut } = useAuth();
@@ -130,15 +131,29 @@ export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
               >
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                required
-                minLength={6}
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-2.5 pr-12 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             {error && (
@@ -169,7 +184,7 @@ export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
                   // Navigate to login route for clarity
                   router.push("/");
                 }}
-                className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                className="text-blue-600 hover:text-blue-700 font-medium cursor-pointer text-sm"
               >
                 Already have an account? Sign in
               </button>
@@ -181,7 +196,7 @@ export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
                   // Navigate to signup route
                   router.push("/signup");
                 }}
-                className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                className="text-blue-600 cursor-pointer hover:text-blue-700 font-medium text-sm"
               >
                 Don&apos;t have an account? Sign up
               </button>
