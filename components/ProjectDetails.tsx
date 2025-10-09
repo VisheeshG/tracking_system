@@ -26,6 +26,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
   const [showNewLink, setShowNewLink] = useState(false);
   const [loading, setLoading] = useState(true);
   const [totalClicks, setTotalClicks] = useState(0);
+  const [platformCount, setPlatformCount] = useState(0);
   const [projectUrl, setProjectUrl] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -49,6 +50,12 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
           .in("link_id", linkIds);
 
         setTotalClicks(count || 0);
+
+        // Calculate unique platforms
+        const uniquePlatforms = new Set(data.map((l) => l.platform));
+        setPlatformCount(uniquePlatforms.size);
+      } else {
+        setPlatformCount(0);
       }
     } catch (error) {
       console.error("Error loading links:", error);
@@ -212,22 +219,24 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-3 sm:py-4">
           <button
             onClick={() => router.push("/dashboard")}
-            className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 mb-4 transition"
+            className="flex items-center space-x-2 text-sm sm:text-base text-slate-600 hover:text-slate-900 mb-3 sm:mb-4 transition"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Projects</span>
           </button>
 
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-0">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 break-words">
                 {project.name}
               </h1>
               {project.description && (
-                <p className="text-slate-600 mt-2">{project.description}</p>
+                <p className="text-sm sm:text-base text-slate-600 mt-2">
+                  {project.description}
+                </p>
               )}
               {/* <span className="inline-block mt-2 px-3 py-1 bg-slate-100 text-slate-700 text-sm rounded-full font-mono">
                 {project.slug}
@@ -238,64 +247,72 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
                 projectName={project.name}
                 projectDescription={project.description || undefined}
                 projectUrl={projectUrl}
-                className="mt-2"
+                className="mt-0 sm:mt-2"
               />
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 mb-1">Total Links</p>
-                <p className="text-3xl font-bold text-slate-900">
+                <p className="text-xs sm:text-sm text-slate-600 mb-1">
+                  Total Links
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-slate-900">
                   {links.length}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                <Link2 className="w-6 h-6 text-blue-600" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Link2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 mb-1">Total Clicks</p>
-                <p className="text-3xl font-bold text-slate-900">
+                <p className="text-xs sm:text-sm text-slate-600 mb-1">
+                  Total Clicks
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-slate-900">
                   {totalClicks}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
-                <MousePointerClick className="w-6 h-6 text-green-600" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                <MousePointerClick className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 mb-1">Active Links</p>
-                <p className="text-3xl font-bold text-slate-900">
-                  {links.length}
+                <p className="text-xs sm:text-sm text-slate-600 mb-1">
+                  Platforms
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-slate-900">
+                  {platformCount}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-emerald-50 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-emerald-600" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
               </div>
             </div>
           </div>
         </div>
 
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-slate-900">Links</h2>
+        <div className="mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+              Links
+            </h2>
             <button
               onClick={() => setShowNewLink(!showNewLink)}
-              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg transition font-medium"
+              className="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg transition font-medium w-full sm:w-auto"
             >
               <Plus className="w-5 h-5" />
               <span>New Link</span>
@@ -304,16 +321,16 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-slate-600">
+          <div className="text-center py-12 text-sm sm:text-base text-slate-600">
             Loading links...
           </div>
         ) : links.length === 0 ? (
-          <div className="bg-white rounded-xl border-2 border-dashed border-slate-300 p-12 text-center">
-            <Link2 className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-slate-900 mb-2">
+          <div className="bg-white rounded-xl border-2 border-dashed border-slate-300 p-6 sm:p-8 lg:p-12 text-center">
+            <Link2 className="w-12 h-12 sm:w-16 sm:h-16 text-slate-400 mx-auto mb-3 sm:mb-4" />
+            <h3 className="text-lg sm:text-xl font-semibold text-slate-900 mb-2">
               No links yet
             </h3>
-            <p className="text-slate-600 mb-6">
+            <p className="text-sm sm:text-base text-slate-600 mb-4 sm:mb-6">
               Create your first trackable link for this project
             </p>
             <button
@@ -335,12 +352,12 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
       </div>
 
       {showNewLink && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
           <div
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowNewLink(false)}
           />
-          <div className="relative z-10 w-full max-w-lg mx-4">
+          <div className="relative z-10 w-full max-w-lg">
             <NewLinkForm
               onSubmit={handleCreateLink}
               onCancel={() => setShowNewLink(false)}
@@ -444,17 +461,17 @@ function NewLinkForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6"
+      className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6"
     >
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">
+      <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3 sm:mb-4">
         Create New Link
       </h3>
 
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         <div>
           <label
             htmlFor="linkTitle"
-            className="block text-sm font-medium text-slate-700 mb-1"
+            className="block text-xs sm:text-sm font-medium text-slate-700 mb-1"
           >
             Link Title
           </label>
@@ -463,7 +480,7 @@ function NewLinkForm({
             type="text"
             value={linkTitle}
             onChange={(e) => setLinkTitle(e.target.value)}
-            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             placeholder="title"
             required
           />
@@ -475,7 +492,7 @@ function NewLinkForm({
         <div>
           <label
             htmlFor="platform"
-            className="block text-sm font-medium text-slate-700 mb-1"
+            className="block text-xs sm:text-sm font-medium text-slate-700 mb-1"
           >
             Platform Name
           </label>
@@ -484,7 +501,7 @@ function NewLinkForm({
             type="text"
             value={platform}
             onChange={(e) => handlePlatformChange(e.target.value)}
-            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             placeholder="e.g., Instagram, YouTube, TikTok, Twitter"
             required
           />
@@ -496,7 +513,7 @@ function NewLinkForm({
         <div>
           <label
             htmlFor="destinationUrl"
-            className="block text-sm font-medium text-slate-700 mb-1"
+            className="block text-xs sm:text-sm font-medium text-slate-700 mb-1"
           >
             Destination URL
           </label>
@@ -505,7 +522,7 @@ function NewLinkForm({
             type="url"
             value={destinationUrl}
             onChange={(e) => setDestinationUrl(e.target.value)}
-            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             placeholder="https://example.com"
             required
           />
@@ -514,7 +531,7 @@ function NewLinkForm({
         <div>
           <label
             htmlFor="shortCode"
-            className="block text-sm font-medium text-slate-700 mb-1"
+            className="block text-xs sm:text-sm font-medium text-slate-700 mb-1"
           >
             Short Code
           </label>
@@ -523,7 +540,7 @@ function NewLinkForm({
             type="text"
             value={shortCode}
             readOnly
-            className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed"
+            className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed"
             placeholder="Auto-generated code"
             required
           />
@@ -535,11 +552,11 @@ function NewLinkForm({
         </div>
       </div>
 
-      <div className="flex space-x-3 mt-6">
+      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 mt-4 sm:mt-6">
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition font-medium disabled:bg-blue-400 disabled:cursor-not-allowed"
+          className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 sm:py-2.5 text-sm sm:text-base rounded-lg transition font-medium disabled:bg-blue-400 disabled:cursor-not-allowed"
         >
           {isSubmitting ? "Creating..." : "Create Link"}
         </button>
@@ -547,7 +564,7 @@ function NewLinkForm({
           type="button"
           onClick={onCancel}
           disabled={isSubmitting}
-          className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg transition font-medium disabled:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+          className="w-full sm:flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 sm:py-2.5 text-sm sm:text-base rounded-lg transition font-medium disabled:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
         >
           Cancel
         </button>

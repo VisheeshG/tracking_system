@@ -78,53 +78,56 @@ export function LinkList({
                 onSelectLink(link);
               }
             }}
-            className={`bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-blue-300 transition group ${
+            className={`bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 hover:shadow-md hover:border-blue-300 transition group ${
               readOnly && !enableSelectInReadOnly
                 ? "cursor-default"
                 : "cursor-pointer"
             }`}
           >
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-start space-x-4 flex-1">
-                <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center group-hover:bg-blue-100 transition flex-shrink-0">
-                  <Link2 className="w-6 h-6 text-blue-600" />
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4 gap-4">
+              <div className="flex items-start space-x-3 sm:space-x-4 flex-1 min-w-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-50 rounded-lg flex items-center justify-center group-hover:bg-blue-100 transition flex-shrink-0">
+                  <Link2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <h3 className="text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                    <h3 className="text-base sm:text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition break-words">
                       {link.link_title}
                     </h3>
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
+                    <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium self-start">
                       {link.platform}
                     </span>
                   </div>
 
-                  <div className="space-y-1">
-                    <p className="text-sm text-slate-600 flex items-center space-x-2">
-                      <span className="font-medium">Destination:</span>
+                  <div className="space-y-2">
+                    <div className="text-sm text-slate-600">
+                      <span className="font-medium block sm:inline">
+                        Destination:
+                      </span>
                       <a
                         href={link.destination_url}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="text-blue-600 hover:underline truncate"
+                        className="text-blue-600 hover:underline break-all block sm:inline sm:ml-2"
                       >
                         {link.destination_url}
                       </a>
-                    </p>
+                    </div>
 
-                    {/* <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-slate-600">
-                      Tracking URL:
-                    </span>
-                    <code className="text-sm bg-slate-100 px-2 py-1 rounded font-mono text-slate-800">
-                      /{projectSlug}/{link.short_code}/[creator]/[submission]
-                    </code>
-                  </div> */}
+                    <div className="text-sm">
+                      <span className="font-medium text-slate-600 block sm:inline">
+                        Tracking URL:
+                      </span>
+                      <code className="text-xs sm:text-sm bg-slate-100 px-2 py-1 rounded font-mono text-slate-800 break-all block sm:inline sm:ml-2 mt-1 sm:mt-0">
+                        {baseUrl}/{projectSlug}/{link.short_code}/[creator]/
+                        {link.submission_number || "[submission]"}
+                      </code>
+                    </div>
 
                     {link.submission_number && (
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-medium text-slate-600">
                           Submission:
                         </span>
@@ -137,7 +140,7 @@ export function LinkList({
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2 ml-4">
+              <div className="flex items-center space-x-2 sm:ml-4 self-end sm:self-start">
                 <button
                   onClick={(e) =>
                     handleCopy(
@@ -151,7 +154,7 @@ export function LinkList({
                   title="Copy tracking URL"
                 >
                   {copiedId === link.id ? (
-                    <span className="text-xs text-green-600 font-medium">
+                    <span className="text-xs text-green-600 font-medium whitespace-nowrap">
                       Copied!
                     </span>
                   ) : (
@@ -171,12 +174,12 @@ export function LinkList({
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+            <div className="pt-3 sm:pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <span className="text-xs text-slate-500">
                 Created {new Date(link.created_at).toLocaleDateString()}
               </span>
               {!readOnly && (
-                <div className="flex items-center space-x-2 text-blue-600 text-sm font-medium opacity-0 group-hover:opacity-100 transition">
+                <div className="flex items-center space-x-2 text-blue-600 text-sm font-medium sm:opacity-0 sm:group-hover:opacity-100 transition">
                   <span>View Analytics</span>
                   <ExternalLink className="w-4 h-4" />
                 </div>
