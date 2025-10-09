@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { supabase, Project, Link } from "@/lib/supabase";
 import { LinkList } from "@/components/LinkList";
 import { Analytics } from "@/components/Analytics";
 
 export default function PublicProjectPage() {
   const params = useParams();
-  const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
   const [links, setLinks] = useState<Link[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +55,7 @@ export default function PublicProjectPage() {
           const match = linksData.find((l) => l.id === qId);
           if (match) setSelectedLinkId(match.id);
         }
-      } catch (err) {
+      } catch {
         setError("Failed to load project");
       } finally {
         setLoading(false);

@@ -37,7 +37,7 @@ export default function ProjectPage() {
         }
       })();
     }
-  }, [loading, user, router]);
+  }, [loading, user, router, projectId]);
 
   useEffect(() => {
     const loadProject = async () => {

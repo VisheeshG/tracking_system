@@ -37,11 +37,18 @@ export async function GET(
   request: NextRequest,
   {
     params,
-  }: { params: { projectSlug: string; shortCode: string; params?: string[] } }
+  }: {
+    params: Promise<{
+      projectSlug: string;
+      shortCode: string;
+      params?: string[];
+    }>;
+  }
 ) {
   try {
-    const projectSlug = params.projectSlug;
-    const additionalParams = params.params || [];
+    const resolvedParams = await params;
+    const projectSlug = resolvedParams.projectSlug;
+    const additionalParams = resolvedParams.params || [];
     const creatorUsername = additionalParams[0] || null;
     const submissionNumber = additionalParams[1] || null;
 
