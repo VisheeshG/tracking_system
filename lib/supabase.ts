@@ -48,7 +48,6 @@ export type LinkClick = {
   submission_number: string | null;
   ip_address: string | null;
   user_agent: string | null;
-  referrer: string | null;
   country: string | null;
   city: string | null;
   device_type: string | null;
