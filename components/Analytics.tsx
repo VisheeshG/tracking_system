@@ -128,7 +128,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
 
   const baseUrl = window.location.origin;
   const trackingUrl = `${baseUrl}/${projectSlug}/${link.short_code}`;
-  const exampleUrl = `${trackingUrl}/johndoe/${link.submission_number}`;
+  const exampleUrl = `${trackingUrl}/johndoe/sub1`;
 
   if (loading) {
     return (
@@ -252,11 +252,10 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
             Tracking URL Format
           </h3>
           <p className="text-xs sm:text-sm text-slate-600 mb-3">
-            Use this format to track different creators and submissions for this
-            platform:
+            Use this format to track different creators for this platform:
           </p>
           <code className="block bg-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg font-mono text-xs sm:text-sm text-slate-800 mb-2 overflow-x-auto">
-            {trackingUrl}/[creator]/{link.submission_number}
+            {trackingUrl}/[creator]/sub1
           </code>
           <p className="text-xs text-slate-600 mb-2">Example:</p>
           <code className="block bg-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg font-mono text-xs sm:text-sm text-blue-600 overflow-x-auto">

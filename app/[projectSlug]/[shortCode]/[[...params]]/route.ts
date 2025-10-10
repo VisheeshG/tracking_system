@@ -48,9 +48,11 @@ export async function GET(
   try {
     const resolvedParams = await params;
     const projectSlug = resolvedParams.projectSlug;
+    const shortCode = resolvedParams.shortCode;
     const additionalParams = resolvedParams.params || [];
     const creatorUsername = additionalParams[0] || null;
-    const submissionNumber = additionalParams[1] || null;
+    // Use submission number from URL if provided, otherwise use from database
+    const submissionNumberFromUrl = additionalParams[1] || null;
 
     // Get project
     const { data: projectData } = await supabase
@@ -66,8 +68,8 @@ export async function GET(
     // Get link
     const { data: linkData } = await supabase
       .from("links")
-      .select("id, destination_url, platform")
-      .eq("submission_number", submissionNumber)
+      .select("id, destination_url, platform, submission_number")
+      .eq("short_code", shortCode)
       .eq("project_id", projectData.id)
       .single();
 
@@ -167,12 +169,17 @@ export async function GET(
 
     console.log("Final location values:", { country, city });
 
+    // Use submission number from URL if provided, otherwise use from database
+    const submissionNumber =
+      submissionNumberFromUrl || linkData.submission_number;
+
     // Record click with all tracking data including location
     console.log("Recording click with data:", {
       link_id: linkData.id,
       country,
       city,
       device_type: deviceType,
+      submission_number: submissionNumber,
     });
 
     const { error: trackError } = await supabase.from("link_clicks").insert({

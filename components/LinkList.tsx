@@ -37,11 +37,10 @@ export function LinkList({
   const handleCopy = (
     e: React.MouseEvent,
     shortCode: string,
-    linkId: string,
-    submissionNumber: string
+    linkId: string
   ) => {
     e.stopPropagation();
-    const trackingUrl = `${baseUrl}/${projectSlug}/${shortCode}/[creator]/${submissionNumber}`;
+    const trackingUrl = `${baseUrl}/${projectSlug}/${shortCode}/[creator]/sub1`;
     navigator.clipboard.writeText(trackingUrl);
     setCopiedId(linkId);
     setTimeout(() => setCopiedId(null), 2000);
@@ -121,12 +120,11 @@ export function LinkList({
                         Tracking URL:
                       </span>
                       <code className="text-xs sm:text-sm bg-slate-100 px-2 py-1 rounded font-mono text-slate-800 break-all block sm:inline sm:ml-2 mt-1 sm:mt-0">
-                        {baseUrl}/{projectSlug}/{link.short_code}/[creator]/
-                        {link.submission_number || "[submission]"}
+                        {baseUrl}/{projectSlug}/{link.short_code}/[creator]/sub1
                       </code>
                     </div>
 
-                    {link.submission_number && (
+                    {/* {link.submission_number && (
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-medium text-slate-600">
                           Submission:
@@ -135,21 +133,14 @@ export function LinkList({
                           {link.submission_number}
                         </span>
                       </div>
-                    )}
+                    )} */}
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center space-x-2 sm:ml-4 self-end sm:self-start">
                 <button
-                  onClick={(e) =>
-                    handleCopy(
-                      e,
-                      link.short_code,
-                      link.id,
-                      link.submission_number || ""
-                    )
-                  }
+                  onClick={(e) => handleCopy(e, link.short_code, link.id)}
                   className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
                   title="Copy tracking URL"
                 >

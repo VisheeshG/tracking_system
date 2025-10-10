@@ -170,16 +170,8 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
         console.log(`Generated new short code: ${finalShortCode}`);
       }
 
-      // Get the next submission number for this project
-      const { data: existingLinks, error: countError } = await supabase
-        .from("links")
-        .select("id")
-        .eq("project_id", project.id)
-        .order("created_at", { ascending: true });
-
-      if (countError) throw countError;
-
-      const nextSubmissionNumber = `sub${(existingLinks?.length || 0) + 1}`;
+      // All links use "sub1" as the submission number
+      const submissionNumber = "sub1";
 
       const { data, error } = await supabase
         .from("links")
@@ -189,7 +181,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
           platform,
           destination_url: destinationUrl,
           short_code: finalShortCode,
-          submission_number: nextSubmissionNumber,
+          submission_number: submissionNumber,
         })
         .select()
         .single();
