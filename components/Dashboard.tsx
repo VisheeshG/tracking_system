@@ -78,6 +78,21 @@ export function Dashboard() {
         return false;
       }
 
+      // Check if slug already exists (across all users)
+      const { data: existingSlug, error: slugError } = await supabase
+        .from("projects")
+        .select("id")
+        .eq("slug", slug)
+        .single();
+
+      if (!slugError && existingSlug) {
+        toast.error(
+          `Project slug "${slug}" is already taken. Click "New" to generate a different one.`,
+          { duration: 5000 }
+        );
+        return false;
+      }
+
       const { data, error } = await supabase
         .from("projects")
         .insert({
@@ -89,7 +104,17 @@ export function Dashboard() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Check if error is due to duplicate slug constraint
+        if (error.code === "23505" && error.message.includes("slug")) {
+          toast.error(
+            `Project slug "${slug}" is already taken. Click "New" to generate a different one.`,
+            { duration: 5000 }
+          );
+          return false;
+        }
+        throw error;
+      }
 
       setProjects([data, ...projects]);
       setShowNewProject(false);
@@ -106,15 +131,81 @@ export function Dashboard() {
 
   const handleDeleteProject = async (projectId: string) => {
     try {
-      const { error } = await supabase
+      console.log("Starting deletion for project:", projectId);
+
+      // First, get all links for this project
+      const { data: links, error: linksError } = await supabase
+        .from("links")
+        .select("id")
+        .eq("project_id", projectId);
+
+      if (linksError) {
+        console.error("Error fetching links:", linksError);
+        throw linksError;
+      }
+
+      console.log(`Found ${links?.length || 0} links for project`);
+
+      // Delete all link_clicks for each link
+      if (links && links.length > 0) {
+        const linkIds = links.map((link) => link.id);
+        console.log("Deleting link_clicks for link IDs:", linkIds);
+
+        const { error: clicksError, count: clicksCount } = await supabase
+          .from("link_clicks")
+          .delete({ count: "exact" })
+          .in("link_id", linkIds);
+
+        if (clicksError) {
+          console.error("Error deleting link_clicks:", clicksError);
+          throw clicksError;
+        }
+        console.log(`Deleted ${clicksCount} link_clicks`);
+
+        // Delete all links for this project
+        console.log("Deleting links for project:", projectId);
+        const { error: deleteLinksError, count: linksCount } = await supabase
+          .from("links")
+          .delete({ count: "exact" })
+          .eq("project_id", projectId);
+
+        if (deleteLinksError) {
+          console.error("Error deleting links:", deleteLinksError);
+          throw deleteLinksError;
+        }
+        console.log(`Deleted ${linksCount} links`);
+      }
+
+      // Delete all project passwords
+      console.log("Deleting project passwords for project:", projectId);
+      const { error: passwordsError, count: passwordsCount } = await supabase
+        .from("project_passwords")
+        .delete({ count: "exact" })
+        .eq("project_id", projectId);
+
+      if (passwordsError) {
+        console.error("Error deleting passwords:", passwordsError);
+        throw passwordsError;
+      }
+      console.log(`Deleted ${passwordsCount} project_passwords`);
+
+      // Finally, delete the project itself
+      console.log("Deleting project:", projectId);
+      const { error, count: projectCount } = await supabase
         .from("projects")
-        .delete()
+        .delete({ count: "exact" })
         .eq("id", projectId);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error deleting project:", error);
+        throw error;
+      }
+      console.log(`Deleted ${projectCount} project(s)`);
 
       setProjects(projects.filter((p) => p.id !== projectId));
+      toast.success("Project and all associated data deleted successfully");
     } catch (error: unknown) {
+      console.error("Error deleting project:", error);
       toast.error(
         error instanceof Error ? error.message : "Error deleting project"
       );
@@ -362,9 +453,9 @@ function NewProjectForm({
             </button>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Auto-generated single letter when you type a project name. Click
-            &quot;New&quot; for a fresh random letter. This field cannot be
-            edited.
+            Auto-generated when you type a project name (starts with single
+            letters like &quot;a&quot;, then &quot;a12&quot;, then
+            &quot;ab1&quot;, etc.). Click &quot;New&quot; if already taken.
           </p>
         </div>
 

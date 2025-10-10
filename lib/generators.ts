@@ -5,31 +5,55 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * Generate a random project slug with one random letter
- * @returns Random single letter
+ * Generate a random project slug with configurable format
+ * @param letterCount - Number of letters (default: 1)
+ * @param numberCount - Number of numbers (default: 0)
+ * @returns Random string in format: letters + numbers (e.g., "a" or "a12")
  */
-export function generateRandomProjectSlug(): string {
+export function generateRandomProjectSlug(
+  letterCount: number = 1,
+  numberCount: number = 0
+): string {
   const letters = "abcdefghijklmnopqrstuvwxyz";
-  return letters.charAt(Math.floor(Math.random() * letters.length));
+  const numbers = "0123456789";
+
+  let slug = "";
+
+  // Generate random letters
+  for (let i = 0; i < letterCount; i++) {
+    slug += letters.charAt(Math.floor(Math.random() * letters.length));
+  }
+
+  // Generate random numbers
+  for (let i = 0; i < numberCount; i++) {
+    slug += numbers.charAt(Math.floor(Math.random() * numbers.length));
+  }
+
+  return slug;
 }
 
 /**
- * Generate a random short code with 3 letters + 2 numbers
- * @returns Random string in format: 3 letters + 2 numbers (e.g., "abc12")
+ * Generate a random short code with configurable format
+ * @param letterCount - Number of letters (default: 2)
+ * @param numberCount - Number of numbers (default: 3)
+ * @returns Random string in format: letters + numbers (e.g., "ab123")
  */
-export function generateRandomShortCode(): string {
+export function generateRandomShortCode(
+  letterCount: number = 2,
+  numberCount: number = 3
+): string {
   const letters = "abcdefghijklmnopqrstuvwxyz";
   const numbers = "0123456789";
 
   let result = "";
 
-  // Generate 3 random letters
-  for (let i = 0; i < 3; i++) {
+  // Generate random letters
+  for (let i = 0; i < letterCount; i++) {
     result += letters.charAt(Math.floor(Math.random() * letters.length));
   }
 
-  // Generate 2 random numbers
-  for (let i = 0; i < 2; i++) {
+  // Generate random numbers
+  for (let i = 0; i < numberCount; i++) {
     result += numbers.charAt(Math.floor(Math.random() * numbers.length));
   }
 
@@ -85,49 +109,108 @@ export async function isShortCodeUnique(
 }
 
 /**
- * Generate a unique project slug
+ * Generate a unique project slug with progressive format
+ * Starts with single letters, then moves to 1 letter + 2 numbers, then 2 letters + 1 number, and so on
  * @param supabase - Supabase client
- * @param maxAttempts - Maximum attempts to generate unique slug (default: 26 for single letters)
+ * @param maxAttempts - Maximum attempts per format (default: 50)
  * @returns Promise<string> - Unique project slug
  */
 export async function generateUniqueProjectSlug(
   supabase: SupabaseClient,
-  maxAttempts: number = 26
+  maxAttempts: number = 50
 ): Promise<string> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const slug = generateRandomProjectSlug();
-    const isUnique = await isProjectSlugUnique(slug, supabase);
+  // Define format patterns: [letterCount, numberCount]
+  const formats: [number, number][] = [
+    [1, 0], // a - 26 combinations
+    [1, 2], // a12 - 26 * 100 = 2,600 combinations
+    [2, 1], // ab1 - 26^2 * 10 = 6,760 combinations
+    [1, 3], // a123 - 26 * 1,000 = 26,000 combinations
+    [3, 0], // abc - 26^3 = 17,576 combinations
+    [2, 2], // ab12 - 26^2 * 100 = 67,600 combinations
+    [3, 1], // abc1 - 26^3 * 10 = 175,760 combinations
+    [2, 3], // ab123 - 26^2 * 1,000 = 676,000 combinations
+    [4, 0], // abcd - 26^4 = 456,976 combinations
+    [3, 2], // abc12 - 26^3 * 100 = 1,757,600 combinations
+  ];
 
-    if (isUnique) {
-      return slug;
+  // Try each format pattern
+  for (const [letterCount, numberCount] of formats) {
+    // For single letters, try to find an available one directly
+    if (letterCount === 1 && numberCount === 0) {
+      const { data: allProjects } = await supabase
+        .from("projects")
+        .select("slug");
+
+      const takenLetters = new Set(
+        allProjects
+          ?.map((p) => p.slug)
+          .filter((slug) => slug.length === 1 && /^[a-z]$/.test(slug)) || []
+      );
+
+      const letters = "abcdefghijklmnopqrstuvwxyz".split("");
+      const availableLetters = letters.filter(
+        (letter) => !takenLetters.has(letter)
+      );
+
+      if (availableLetters.length > 0) {
+        const randomLetter =
+          availableLetters[Math.floor(Math.random() * availableLetters.length)];
+        console.log("Generated single letter slug:", randomLetter);
+        return randomLetter;
+      }
+      console.log("All 26 single letters are taken, moving to next format");
+      continue;
+    }
+
+    // For other formats, try random generation
+    for (let i = 0; i < maxAttempts; i++) {
+      const slug = generateRandomProjectSlug(letterCount, numberCount);
+      const isUnique = await isProjectSlugUnique(slug, supabase);
+
+      if (isUnique) {
+        return slug;
+      }
     }
   }
 
-  // Fallback: add timestamp to make it unique if all single letters are taken
-  return generateRandomProjectSlug() + Date.now().toString().slice(-4);
+  // Final fallback: use longest format with timestamp
+  return generateRandomProjectSlug(3, 2) + Date.now().toString().slice(-2);
 }
 
 /**
- * Generate a unique short code
+ * Generate a unique short code with progressive format
+ * Starts with 2 letters + 3 numbers, then moves to 3 letters + 2 numbers, and so on
  * @param supabase - Supabase client
- * @param maxAttempts - Maximum attempts to generate unique short code (default: 10)
+ * @param maxAttempts - Maximum attempts per format (default: 50)
  * @returns Promise<string> - Unique short code
  */
 export async function generateUniqueShortCode(
   supabase: SupabaseClient,
-  maxAttempts: number = 10
+  maxAttempts: number = 50
 ): Promise<string> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const shortCode = generateRandomShortCode();
-    const isUnique = await isShortCodeUnique(shortCode, supabase);
+  // Define format patterns: [letterCount, numberCount]
+  const formats: [number, number][] = [
+    [2, 3], // ab123 - 26^2 * 10^3 = 676,000 combinations
+    [3, 2], // abc12 - 26^3 * 10^2 = 1,757,600 combinations
+    [4, 1], // abcd1 - 26^4 * 10 = 4,569,760 combinations
+    [3, 3], // abc123 - 26^3 * 10^3 = 17,576,000 combinations
+    [4, 2], // abcd12 - 26^4 * 10^2 = 45,697,600 combinations
+  ];
 
-    if (isUnique) {
-      return shortCode;
+  // Try each format pattern
+  for (const [letterCount, numberCount] of formats) {
+    for (let i = 0; i < maxAttempts; i++) {
+      const shortCode = generateRandomShortCode(letterCount, numberCount);
+      const isUnique = await isShortCodeUnique(shortCode, supabase);
+
+      if (isUnique) {
+        return shortCode;
+      }
     }
   }
 
-  // Fallback: add timestamp to make it unique
-  return generateRandomShortCode() + Date.now().toString().slice(-2);
+  // Final fallback: use longest format with timestamp
+  return generateRandomShortCode(4, 2) + Date.now().toString().slice(-2);
 }
 
 /**

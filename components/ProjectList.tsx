@@ -73,8 +73,14 @@ export function ProjectList({
             )}
 
             <div className="flex items-center justify-between pt-3 sm:pt-4 border-t border-slate-100">
-              {/* <span className="text-xs text-slate-500 font-mono">{project.slug}</span> */}
-              {/* <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition" /> */}
+              <div className="flex items-center space-x-2">
+                <span className="text-xs text-slate-400 font-medium">
+                  Slug:
+                </span>
+                <span className="text-sm text-blue-600 font-mono font-semibold bg-blue-50 px-2 py-1 rounded">
+                  {project.slug}
+                </span>
+              </div>
             </div>
           </div>
         ))}

@@ -15,7 +15,7 @@ import { LinkList } from "./LinkList";
 import { Analytics } from "./Analytics";
 import { SocialShare } from "./SocialShare";
 import { ProjectPasswordManager } from "./ProjectPasswordManager";
-import { generateUniqueProjectShortCode } from "@/lib/generators";
+import { generateUniqueShortCode } from "@/lib/generators";
 import toast from "react-hot-toast";
 
 interface ProjectDetailsProps {
@@ -32,6 +32,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
   const [platformCount, setPlatformCount] = useState(0);
   const [projectUrl, setProjectUrl] = useState("");
   const [accessToken, setAccessToken] = useState<string>("");
+  const [formResetKey, setFormResetKey] = useState(0);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -152,6 +153,23 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
         return false;
       }
 
+      // Verify short code is truly unique before inserting (safety check)
+      const { data: existingShortCode } = await supabase
+        .from("links")
+        .select("id")
+        .eq("short_code", shortCode)
+        .single();
+
+      // If short code already exists, generate a new unique one
+      let finalShortCode = shortCode;
+      if (existingShortCode) {
+        console.log(
+          `Short code ${shortCode} already exists, generating new one...`
+        );
+        finalShortCode = await generateUniqueShortCode(supabase);
+        console.log(`Generated new short code: ${finalShortCode}`);
+      }
+
       // Get the next submission number for this project
       const { data: existingLinks, error: countError } = await supabase
         .from("links")
@@ -170,7 +188,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
           link_title: linkTitle,
           platform,
           destination_url: destinationUrl,
-          short_code: shortCode,
+          short_code: finalShortCode,
           submission_number: nextSubmissionNumber,
         })
         .select()
@@ -180,6 +198,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
 
       setLinks([data, ...links]);
       setShowNewLink(false);
+      setFormResetKey((prev) => prev + 1); // Reset form for next link
       return true;
     } catch (error: unknown) {
       toast.error(
@@ -197,15 +216,39 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
 
   const handleDeleteLink = async (linkId: string) => {
     try {
-      const { error } = await supabase.from("links").delete().eq("id", linkId);
+      console.log("Starting deletion for link:", linkId);
 
-      if (error) throw error;
+      // First, delete all link_clicks for this link
+      const { error: clicksError, count: clicksCount } = await supabase
+        .from("link_clicks")
+        .delete({ count: "exact" })
+        .eq("link_id", linkId);
+
+      if (clicksError) {
+        console.error("Error deleting link_clicks:", clicksError);
+        throw clicksError;
+      }
+      console.log(`Deleted ${clicksCount} link_clicks`);
+
+      // Then delete the link itself
+      const { error, count: linkCount } = await supabase
+        .from("links")
+        .delete({ count: "exact" })
+        .eq("id", linkId);
+
+      if (error) {
+        console.error("Error deleting link:", error);
+        throw error;
+      }
+      console.log(`Deleted ${linkCount} link(s)`);
 
       setLinks(links.filter((l) => l.id !== linkId));
       if (selectedLink?.id === linkId) {
         setSelectedLink(null);
       }
+      toast.success("Link and all click data deleted successfully");
     } catch (error: unknown) {
+      console.error("Error deleting link:", error);
       toast.error(
         error instanceof Error ? error.message : "Error deleting link"
       );
@@ -387,9 +430,9 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
           />
           <div className="relative z-10 w-full max-w-lg">
             <NewLinkForm
+              key={formResetKey}
               onSubmit={handleCreateLink}
               onCancel={() => setShowNewLink(false)}
-              projectId={project.id}
             />
           </div>
         </div>
@@ -435,7 +478,6 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
 function NewLinkForm({
   onSubmit,
   onCancel,
-  projectId,
 }: {
   onSubmit: (
     linkTitle: string,
@@ -444,7 +486,6 @@ function NewLinkForm({
     shortCode: string
   ) => Promise<boolean>;
   onCancel: () => void;
-  projectId: string;
 }) {
   const [linkTitle, setLinkTitle] = useState("");
   const [platform, setPlatform] = useState("");
@@ -453,23 +494,21 @@ function NewLinkForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handlePlatformChange = (value: string) => {
-    setPlatform(value);
+  const handleLinkTitleChange = (value: string) => {
+    setLinkTitle(value);
 
     // Clear existing timeout
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
 
-    // Auto-generate short code when platform changes (with debounce)
+    // Auto-generate unique short code when link title changes (with debounce)
     if (value.trim()) {
       debounceTimeoutRef.current = setTimeout(async () => {
         try {
-          const projectCode = await generateUniqueProjectShortCode(
-            supabase,
-            projectId
-          );
-          setShortCode(projectCode);
+          const uniqueCode = await generateUniqueShortCode(supabase);
+          console.log(`Generated short code for "${value}":`, uniqueCode);
+          setShortCode(uniqueCode);
         } catch (error) {
           console.error("Error auto-generating short code:", error);
         }
@@ -527,7 +566,7 @@ function NewLinkForm({
             id="linkTitle"
             type="text"
             value={linkTitle}
-            onChange={(e) => setLinkTitle(e.target.value)}
+            onChange={(e) => handleLinkTitleChange(e.target.value)}
             className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             placeholder="title"
             required
@@ -548,7 +587,7 @@ function NewLinkForm({
             id="platform"
             type="text"
             value={platform}
-            onChange={(e) => handlePlatformChange(e.target.value)}
+            onChange={(e) => setPlatform(e.target.value)}
             className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             placeholder="e.g., Instagram, YouTube, TikTok, Twitter"
             required
@@ -593,9 +632,9 @@ function NewLinkForm({
             required
           />
           <p className="text-xs text-slate-500 mt-1">
-            Auto-generated when you type a platform name. This short code will
-            be shared across all links in this project. This field cannot be
-            edited.
+            Auto-generated when you type a link title. Each link gets a unique
+            short code (format: 2 letters + 3 numbers, e.g., ab123). This field
+            cannot be edited.
           </p>
         </div>
       </div>
