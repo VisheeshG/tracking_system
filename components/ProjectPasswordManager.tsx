@@ -231,7 +231,7 @@ export function ProjectPasswordManager({
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
                 className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                placeholder="e.g., For brand partner, For investor"
+                placeholder="Description"
                 disabled={isSubmitting}
               />
               <p className="text-xs text-slate-500 mt-1">
