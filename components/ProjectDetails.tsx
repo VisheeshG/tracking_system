@@ -407,6 +407,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
               <ProjectPasswordManager
                 projectId={project.id}
                 accessToken={accessToken}
+                projectSlug={project.slug}
                 onClose={() => setShowPasswordManager(false)}
               />
             </div>

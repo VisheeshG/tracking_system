@@ -69,7 +69,29 @@ export default function PublicProjectPage() {
               // Check if auth is still valid (not expired)
               const expiresAt = new Date(authData.expiresAt);
               if (expiresAt > new Date()) {
-                setIsAuthenticated(true);
+                // Validate that the password still exists in the database
+                if (authData.passwordId) {
+                  const validateResponse = await fetch(
+                    `/api/verify-project-password?project_slug=${projectSlug}&password_id=${authData.passwordId}`
+                  );
+
+                  if (validateResponse.ok) {
+                    const validateData = await validateResponse.json();
+                    if (validateData.valid) {
+                      setIsAuthenticated(true);
+                    } else {
+                      // Password was deleted, clear localStorage
+                      localStorage.removeItem(`project_auth_${projectSlug}`);
+                      setIsAuthenticated(false);
+                    }
+                  } else {
+                    localStorage.removeItem(`project_auth_${projectSlug}`);
+                    setIsAuthenticated(false);
+                  }
+                } else {
+                  // Old format without passwordId, keep for backward compatibility
+                  setIsAuthenticated(true);
+                }
               } else {
                 localStorage.removeItem(`project_auth_${projectSlug}`);
                 setIsAuthenticated(false);
@@ -164,6 +186,7 @@ export default function PublicProjectPage() {
           `project_auth_${projectSlug}`,
           JSON.stringify({
             accessToken: data.accessToken,
+            passwordId: data.passwordId,
             expiresAt: expiresAt.toISOString(),
           })
         );

@@ -14,12 +14,14 @@ interface ProjectPassword {
 interface ProjectPasswordManagerProps {
   projectId: string;
   accessToken: string;
+  projectSlug?: string;
   onClose?: () => void;
 }
 
 export function ProjectPasswordManager({
   projectId,
   accessToken,
+  projectSlug,
   onClose,
 }: ProjectPasswordManagerProps) {
   const [passwords, setPasswords] = useState<ProjectPassword[]>([]);
@@ -132,6 +134,12 @@ export function ProjectPasswordManager({
       }
 
       setPasswords(passwords.filter((p) => p.id !== passwordId));
+
+      // Remove access token from localStorage if projectSlug is provided
+      if (projectSlug) {
+        localStorage.removeItem(`project_auth_${projectSlug}`);
+      }
+
       toast.success("Password deleted successfully");
     } catch (error) {
       console.error("Error deleting password:", error);
