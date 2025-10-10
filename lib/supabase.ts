@@ -55,3 +55,12 @@ export type LinkClick = {
   os: string | null;
   clicked_at: string;
 };
+
+export type ProjectPassword = {
+  id: string;
+  project_id: string;
+  password_hash: string;
+  description: string | null;
+  created_at: string;
+  created_by: string | null;
+};

@@ -9,10 +9,12 @@ import {
   Link2,
   TrendingUp,
   MousePointerClick,
+  Shield,
 } from "lucide-react";
 import { LinkList } from "./LinkList";
 import { Analytics } from "./Analytics";
 import { SocialShare } from "./SocialShare";
+import { ProjectPasswordManager } from "./ProjectPasswordManager";
 import { generateUniqueProjectShortCode } from "@/lib/generators";
 import toast from "react-hot-toast";
 
@@ -24,10 +26,12 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
   const [links, setLinks] = useState<Link[]>([]);
   const [selectedLink, setSelectedLink] = useState<Link | null>(null);
   const [showNewLink, setShowNewLink] = useState(false);
+  const [showPasswordManager, setShowPasswordManager] = useState(false);
   const [loading, setLoading] = useState(true);
   const [totalClicks, setTotalClicks] = useState(0);
   const [platformCount, setPlatformCount] = useState(0);
   const [projectUrl, setProjectUrl] = useState("");
+  const [accessToken, setAccessToken] = useState<string>("");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -68,6 +72,13 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
     loadLinks();
     // Set the project URL for sharing (public view by slug)
     setProjectUrl(`${window.location.origin}/${project.slug}`);
+
+    // Get access token for API calls
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.access_token) {
+        setAccessToken(session.access_token);
+      }
+    });
   }, [loadLinks, project.id, project.slug]);
 
   useEffect(() => {
@@ -95,17 +106,25 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
     }
   }, [links, searchParams]);
 
-  // Close the New Link modal on Escape key
+  // Close modals on Escape key and prevent body scroll
   useEffect(() => {
-    if (!showNewLink) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setShowNewLink(false);
+        if (showNewLink) setShowNewLink(false);
+        if (showPasswordManager) setShowPasswordManager(false);
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showNewLink]);
+
+    // Prevent body scroll when modal is open
+    if (showNewLink || showPasswordManager) {
+      document.body.style.overflow = "hidden";
+      window.addEventListener("keydown", handleKeyDown);
+      return () => {
+        document.body.style.overflow = "unset";
+        window.removeEventListener("keydown", handleKeyDown);
+      };
+    }
+  }, [showNewLink, showPasswordManager]);
 
   const handleCreateLink = async (
     linkTitle: string,
@@ -243,6 +262,14 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
               </span> */}
             </div>
             <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowPasswordManager(true)}
+                className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-4 py-2 rounded-lg transition text-sm sm:text-base"
+                title="Manage Access Passwords"
+              >
+                <Shield className="w-4 h-4" />
+                <span className="hidden sm:inline">Passwords</span>
+              </button>
               <SocialShare
                 projectName={project.name}
                 projectDescription={project.description || undefined}
@@ -351,6 +378,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
         )}
       </div>
 
+      {/* New Link Modal */}
       {showNewLink && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
           <div
@@ -363,6 +391,25 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
               onCancel={() => setShowNewLink(false)}
               projectId={project.id}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Password Management Modal */}
+      {showPasswordManager && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowPasswordManager(false)}
+          />
+          <div className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-2xl">
+              <ProjectPasswordManager
+                projectId={project.id}
+                accessToken={accessToken}
+                onClose={() => setShowPasswordManager(false)}
+              />
+            </div>
           </div>
         </div>
       )}

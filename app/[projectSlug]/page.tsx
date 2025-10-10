@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { supabase, Project, Link } from "@/lib/supabase";
 import { LinkList } from "@/components/LinkList";
 import { Analytics } from "@/components/Analytics";
+import { PasswordVerificationModal } from "@/components/PasswordVerificationModal";
 
 export default function PublicProjectPage() {
   const params = useParams();
@@ -13,15 +14,20 @@ export default function PublicProjectPage() {
   const [loading, setLoading] = useState(true);
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [requiresPassword, setRequiresPassword] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   const projectSlug = params.projectSlug as string;
 
+  // Load project info and check password requirement on mount
   useEffect(() => {
-    const load = async () => {
+    const init = async () => {
       try {
         setLoading(true);
         setError(null);
 
+        // First, load the project basic info (needed for password modal)
         const { data: projectData, error: projectError } = await supabase
           .from("projects")
           .select("*")
@@ -30,15 +36,80 @@ export default function PublicProjectPage() {
 
         if (projectError || !projectData) {
           setError("Project not found");
+          setCheckingAuth(false);
+          setLoading(false);
           return;
         }
 
         setProject(projectData);
 
+        // Check if project requires password
+        const response = await fetch(
+          `/api/verify-project-password?project_slug=${projectSlug}`
+        );
+
+        if (!response.ok) {
+          setError("Project not found");
+          setCheckingAuth(false);
+          setLoading(false);
+          return;
+        }
+
+        const data = await response.json();
+        setRequiresPassword(data.hasPasswords);
+
+        // Check if already authenticated from localStorage
+        if (data.hasPasswords) {
+          const storedAuth = localStorage.getItem(
+            `project_auth_${projectSlug}`
+          );
+          if (storedAuth) {
+            try {
+              const authData = JSON.parse(storedAuth);
+              // Check if auth is still valid (not expired)
+              const expiresAt = new Date(authData.expiresAt);
+              if (expiresAt > new Date()) {
+                setIsAuthenticated(true);
+              } else {
+                localStorage.removeItem(`project_auth_${projectSlug}`);
+                setIsAuthenticated(false);
+              }
+            } catch {
+              localStorage.removeItem(`project_auth_${projectSlug}`);
+              setIsAuthenticated(false);
+            }
+          } else {
+            setIsAuthenticated(false);
+          }
+        } else {
+          setIsAuthenticated(true); // No password required
+        }
+      } catch (err) {
+        console.error("Error during initialization:", err);
+        setError("Failed to load project");
+      } finally {
+        setCheckingAuth(false);
+        setLoading(false);
+      }
+    };
+
+    if (projectSlug) {
+      init();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectSlug]);
+
+  // Load links when authenticated
+  useEffect(() => {
+    const loadLinks = async () => {
+      if (!project) return;
+
+      try {
+        setLoading(true);
         const { data: linksData, error: linksError } = await supabase
           .from("links")
           .select("*")
-          .eq("project_id", projectData.id)
+          .eq("project_id", project.id)
           .order("created_at", { ascending: false });
 
         if (linksError) {
@@ -56,15 +127,79 @@ export default function PublicProjectPage() {
           if (match) setSelectedLinkId(match.id);
         }
       } catch {
-        setError("Failed to load project");
+        setError("Failed to load links");
       } finally {
         setLoading(false);
       }
     };
 
-    if (projectSlug) load();
-  }, [projectSlug]);
+    // Only load links if authenticated and auth check is complete
+    if (project && isAuthenticated && !checkingAuth) {
+      loadLinks();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project, isAuthenticated, checkingAuth]);
 
+  const handlePasswordVerify = async (password: string): Promise<boolean> => {
+    try {
+      const response = await fetch("/api/verify-project-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          project_slug: projectSlug,
+          password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.valid) {
+        // Store authentication in localStorage with expiration (24 hours)
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24);
+
+        localStorage.setItem(
+          `project_auth_${projectSlug}`,
+          JSON.stringify({
+            accessToken: data.accessToken,
+            expiresAt: expiresAt.toISOString(),
+          })
+        );
+
+        setIsAuthenticated(true);
+        return true;
+      }
+
+      return false;
+    } catch (err) {
+      console.error("Password verification error:", err);
+      return false;
+    }
+  };
+
+  // Show loading only during initial check
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-slate-600">Loading...</div>
+      </div>
+    );
+  }
+
+  // Show password modal if required and not authenticated
+  if (requiresPassword && !isAuthenticated && project) {
+    return (
+      <PasswordVerificationModal
+        projectName={project.name}
+        projectSlug={projectSlug}
+        onVerify={handlePasswordVerify}
+      />
+    );
+  }
+
+  // Show loading while fetching links (after authentication)
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
