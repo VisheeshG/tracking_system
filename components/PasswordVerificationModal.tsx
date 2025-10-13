@@ -12,7 +12,6 @@ interface PasswordVerificationModalProps {
 
 export function PasswordVerificationModal({
   projectName,
-  projectSlug,
   onVerify,
   onClose,
 }: PasswordVerificationModalProps) {

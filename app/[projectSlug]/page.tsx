@@ -118,7 +118,6 @@ export default function PublicProjectPage() {
     if (projectSlug) {
       init();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectSlug]);
 
   // Load links when authenticated
@@ -159,7 +158,6 @@ export default function PublicProjectPage() {
     if (project && isAuthenticated && !checkingAuth) {
       loadLinks();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project, isAuthenticated, checkingAuth]);
 
   const handlePasswordVerify = async (password: string): Promise<boolean> => {

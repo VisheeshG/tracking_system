@@ -10,7 +10,7 @@ import {
   Eye,
   X,
 } from "lucide-react";
-import { ClicksChart } from "./ClicksChart";
+import { ClicksAnalyticsChart } from "./ClicksAnalyticsChart";
 
 interface AnalyticsProps {
   link: Link;
@@ -426,7 +426,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
         </div>
 
         {/* Clicks Bar Chart */}
-        <ClicksChart
+        <ClicksAnalyticsChart
           weeklyData={data.clicksByWeek}
           startDate={startDate}
           endDate={endDate}

@@ -14,7 +14,7 @@ import {
 import dayjs from "dayjs";
 import { useState, useEffect } from "react";
 
-interface ClicksChartProps {
+interface ClicksAnalyticsChartProps {
   weeklyData: { week: string; clicks: number }[];
   startDate: string;
   endDate: string;
@@ -23,14 +23,34 @@ interface ClicksChartProps {
   onCurrentWeekClick: () => void;
 }
 
-export function ClicksChart({
+// Format large numbers with Indian numbering system
+function formatNumber(num: number): string {
+  if (num >= 10000000) {
+    // 1 crore and above
+    return `${(num / 10000000).toFixed(2)}Cr`;
+  } else if (num >= 100000) {
+    // 1 lakh and above
+    return `${(num / 100000).toFixed(2)}L`;
+  } else if (num >= 1000) {
+    // 1 thousand and above
+    return `${(num / 1000).toFixed(2)}K`;
+  }
+  return num.toString();
+}
+
+// Format with commas for display
+function formatNumberWithCommas(num: number): string {
+  return num.toLocaleString("en-IN");
+}
+
+export function ClicksAnalyticsChart({
   weeklyData,
   startDate,
   endDate,
   onStartDateChange,
   onEndDateChange,
   onCurrentWeekClick,
-}: ClicksChartProps) {
+}: ClicksAnalyticsChartProps) {
   const [windowWidth, setWindowWidth] = useState<number>(
     typeof window !== "undefined" ? window.innerWidth : 1024
   );
@@ -106,7 +126,7 @@ export function ClicksChart({
                   Total Clicks:
                 </p>
                 <p className="text-lg sm:text-xl font-bold text-slate-900">
-                  {totalClicks}
+                  {formatNumberWithCommas(totalClicks)}
                 </p>
               </div>
             </div>
@@ -165,6 +185,7 @@ export function ClicksChart({
               style={{ fontSize: chartConfig.fontSize }}
               allowDecimals={false}
               width={chartConfig.yAxisWidth}
+              tickFormatter={formatNumber}
             />
             <Tooltip
               contentStyle={{
@@ -175,6 +196,10 @@ export function ClicksChart({
                 fontSize: chartConfig.tooltipFontSize,
               }}
               labelStyle={{ color: "#0f172a", fontWeight: "bold" }}
+              formatter={(value: number) => [
+                formatNumberWithCommas(value),
+                "Clicks",
+              ]}
             />
             <Legend
               wrapperStyle={{
