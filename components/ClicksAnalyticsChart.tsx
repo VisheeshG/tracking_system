@@ -104,7 +104,7 @@ export function ClicksAnalyticsChart({
           </div>
           <div>
             <h3 className="text-base sm:text-lg font-bold text-slate-900">
-              Date Range Clicks
+              Weekly Analytics
             </h3>
             <p className="text-xs text-slate-600">
               {`${dayjs(startDate).format("MMM D, YYYY")} - ${dayjs(
@@ -167,63 +167,73 @@ export function ClicksAnalyticsChart({
         </div>
       </div>
 
-      <div className="w-full h-48 sm:h-64 md:h-72 lg:h-80 xl:h-96">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={weeklyData} margin={chartConfig.margin}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis
-              dataKey="week"
-              stroke="#64748b"
-              style={{ fontSize: chartConfig.fontSize }}
-              angle={weeklyData.length > 7 ? -45 : 0}
-              textAnchor={weeklyData.length > 7 ? "end" : "middle"}
-              height={chartConfig.xAxisHeight}
-              interval={chartConfig.xAxisInterval}
-            />
-            <YAxis
-              stroke="#64748b"
-              style={{ fontSize: chartConfig.fontSize }}
-              allowDecimals={false}
-              width={chartConfig.yAxisWidth}
-              tickFormatter={formatNumber}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "#fff",
-                border: "1px solid #e2e8f0",
-                borderRadius: "0.5rem",
-                boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-                fontSize: chartConfig.tooltipFontSize,
-              }}
-              labelStyle={{ color: "#0f172a", fontWeight: "bold" }}
-              formatter={(value: number) => [
-                formatNumberWithCommas(value),
-                "Clicks",
-              ]}
-            />
-            <Legend
-              wrapperStyle={{
-                fontSize: chartConfig.legendFontSize,
-                paddingTop: chartConfig.legendPaddingTop,
-              }}
-              iconType="circle"
-              iconSize={chartConfig.legendIconSize}
-            />
-            <Bar
-              dataKey="clicks"
-              fill="url(#colorClicks)"
-              radius={[8, 8, 0, 0]}
-              name="Clicks"
-              barSize={chartConfig.barSize}
-            />
-            <defs>
-              <linearGradient id="colorClicks" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#4f46e5" stopOpacity={1} />
-                <stop offset="100%" stopColor="#6366f1" stopOpacity={0.8} />
-              </linearGradient>
-            </defs>
-          </BarChart>
-        </ResponsiveContainer>
+      <div className="w-full h-48 sm:h-64 md:h-72 lg:h-80 xl:h-96 overflow-x-auto overflow-y-hidden">
+        <div
+          style={{
+            minWidth: `${Math.max(
+              weeklyData.length * (chartConfig.barSize + 20),
+              windowWidth < 640 ? 320 : 600
+            )}px`,
+            height: "100%",
+          }}
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={weeklyData} margin={chartConfig.margin}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis
+                dataKey="week"
+                stroke="#64748b"
+                style={{ fontSize: chartConfig.fontSize }}
+                angle={weeklyData.length > 7 ? -45 : 0}
+                textAnchor={weeklyData.length > 7 ? "end" : "middle"}
+                height={chartConfig.xAxisHeight}
+                interval={0}
+              />
+              <YAxis
+                stroke="#64748b"
+                style={{ fontSize: chartConfig.fontSize }}
+                allowDecimals={false}
+                width={chartConfig.yAxisWidth}
+                tickFormatter={formatNumber}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#fff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "0.5rem",
+                  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+                  fontSize: chartConfig.tooltipFontSize,
+                }}
+                labelStyle={{ color: "#0f172a", fontWeight: "bold" }}
+                formatter={(value: number) => [
+                  formatNumberWithCommas(value),
+                  "Clicks",
+                ]}
+              />
+              <Legend
+                wrapperStyle={{
+                  fontSize: chartConfig.legendFontSize,
+                  paddingTop: chartConfig.legendPaddingTop,
+                }}
+                iconType="circle"
+                iconSize={chartConfig.legendIconSize}
+              />
+              <Bar
+                dataKey="clicks"
+                fill="url(#colorClicks)"
+                radius={[8, 8, 0, 0]}
+                name="Clicks"
+                barSize={chartConfig.barSize}
+              />
+              <defs>
+                <linearGradient id="colorClicks" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#4f46e5" stopOpacity={1} />
+                  <stop offset="100%" stopColor="#6366f1" stopOpacity={0.8} />
+                </linearGradient>
+              </defs>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );
