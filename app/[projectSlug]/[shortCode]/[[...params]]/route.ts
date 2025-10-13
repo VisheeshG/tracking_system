@@ -54,6 +54,19 @@ export async function GET(
     // Use submission number from URL if provided, otherwise use from database
     const submissionNumberFromUrl = additionalParams[1] || null;
 
+    // Validate submission number format if provided in URL
+    // Must be in format: sub1, sub2, sub3, etc. (sub followed by any number)
+    if (submissionNumberFromUrl) {
+      const submissionPattern = /^sub\d+$/;
+      if (!submissionPattern.test(submissionNumberFromUrl)) {
+        // Invalid submission number format - don't redirect or track
+        console.log(
+          `Invalid submission number format: ${submissionNumberFromUrl}. Expected format: sub1, sub2, sub3, etc.`
+        );
+        return NextResponse.redirect("about:blank", 307);
+      }
+    }
+
     // Get project
     const { data: projectData } = await supabase
       .from("projects")

@@ -271,39 +271,38 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50">
+      <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200/60 top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-3 sm:py-4">
           <button
             onClick={() => router.push("/dashboard")}
-            className="flex items-center space-x-2 text-sm sm:text-base text-slate-600 hover:text-slate-900 mb-3 sm:mb-4 transition"
+            className="group flex items-center space-x-2 text-sm sm:text-base text-slate-600 hover:text-blue-600 mb-3 sm:mb-4 transition-all duration-200 hover:translate-x-[-4px]"
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Projects</span>
+            <div className="p-1 rounded-lg group-hover:bg-blue-50 transition-colors">
+              <ArrowLeft className="w-4 h-4" />
+            </div>
+            <span className="font-medium">Back to Projects</span>
           </button>
 
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-0">
             <div className="flex-1 min-w-0">
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 break-words">
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 break-words mb-2">
                 {project.name}
               </h1>
               {project.description && (
-                <p className="text-sm sm:text-base text-slate-600 mt-2">
+                <p className="text-sm sm:text-base text-slate-600 font-medium">
                   {project.description}
                 </p>
               )}
-              {/* <span className="inline-block mt-2 px-3 py-1 bg-slate-100 text-slate-700 text-sm rounded-full font-mono">
-                {project.slug}
-              </span> */}
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <button
                 onClick={() => setShowPasswordManager(true)}
-                className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-4 py-2 rounded-lg transition text-sm sm:text-base"
+                className="group flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-3 sm:px-4 py-2 rounded-xl transition-all duration-200 text-sm sm:text-base font-semibold shadow-md hover:shadow-lg hover:scale-105"
                 title="Manage Access Passwords"
               >
-                <Shield className="w-4 h-4" />
-                <span className="hidden sm:inline">Passwords</span>
+                <Shield className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                <span>Passwords</span>
               </button>
               <SocialShare
                 projectName={project.name}
@@ -318,88 +317,97 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
+          <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl border border-slate-200/60 p-4 sm:p-6 transition-all duration-300 hover:scale-[1.02]">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs sm:text-sm text-slate-600 mb-1">
+                <p className="text-xs sm:text-sm text-slate-600 mb-1 font-medium">
                   Total Links
                 </p>
-                <p className="text-2xl sm:text-3xl font-bold text-slate-900">
+                <p className="text-3xl sm:text-4xl font-bold text-slate-900">
                   {links.length}
                 </p>
               </div>
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Link2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Link2 className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
+          <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl border border-slate-200/60 p-4 sm:p-6 transition-all duration-300 hover:scale-[1.02]">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs sm:text-sm text-slate-600 mb-1">
+                <p className="text-xs sm:text-sm text-slate-600 mb-1 font-medium">
                   Total Clicks
                 </p>
-                <p className="text-2xl sm:text-3xl font-bold text-slate-900">
+                <p className="text-3xl sm:text-4xl font-bold text-slate-900">
                   {totalClicks}
                 </p>
               </div>
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                <MousePointerClick className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <MousePointerClick className="w-6 h-6 sm:w-7 sm:h-7 text-green-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
+          <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl border border-slate-200/60 p-4 sm:p-6 transition-all duration-300 hover:scale-[1.02]">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs sm:text-sm text-slate-600 mb-1">
+                <p className="text-xs sm:text-sm text-slate-600 mb-1 font-medium">
                   Platforms
                 </p>
-                <p className="text-2xl sm:text-3xl font-bold text-slate-900">
+                <p className="text-3xl sm:text-4xl font-bold text-slate-900">
                   {platformCount}
                 </p>
               </div>
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <TrendingUp className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-600" />
               </div>
             </div>
           </div>
         </div>
 
-        <div className="mb-4 sm:mb-6">
+        <div className="mb-6 sm:mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">
               Links
             </h2>
             <button
               onClick={() => setShowNewLink(!showNewLink)}
-              className="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg transition font-medium w-full sm:w-auto"
+              className="group flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-5 sm:px-6 py-3 rounded-xl transition-all duration-200 font-semibold shadow-lg hover:shadow-xl w-full sm:w-auto hover:scale-105"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200" />
               <span>New Link</span>
             </button>
           </div>
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-sm sm:text-base text-slate-600">
-            Loading links...
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-12 text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4 animate-pulse shadow-lg">
+              <Link2 className="w-8 h-8 text-white" />
+            </div>
+            <p className="text-slate-700 font-semibold text-lg">
+              Loading links...
+            </p>
+            <p className="text-slate-500 text-sm mt-1">Please wait</p>
           </div>
         ) : links.length === 0 ? (
-          <div className="bg-white rounded-xl border-2 border-dashed border-slate-300 p-6 sm:p-8 lg:p-12 text-center">
-            <Link2 className="w-12 h-12 sm:w-16 sm:h-16 text-slate-400 mx-auto mb-3 sm:mb-4" />
-            <h3 className="text-lg sm:text-xl font-semibold text-slate-900 mb-2">
+          <div className="bg-white rounded-2xl border-2 border-dashed border-slate-300 p-8 sm:p-12 lg:p-16 text-center shadow-sm">
+            <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl mb-6">
+              <Link2 className="w-10 h-10 sm:w-12 sm:h-12 text-blue-600" />
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3">
               No links yet
             </h3>
-            <p className="text-sm sm:text-base text-slate-600 mb-4 sm:mb-6">
-              Create your first trackable link for this project
+            <p className="text-sm sm:text-base text-slate-600 mb-6 sm:mb-8 max-w-md mx-auto">
+              Create your first trackable link for this project and start
+              monitoring clicks
             </p>
             <button
               onClick={() => setShowNewLink(true)}
-              className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition font-medium"
+              className="group inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-4 rounded-xl transition-all duration-200 font-semibold shadow-lg hover:shadow-xl hover:scale-105"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200" />
               <span>Create Link</span>
             </button>
           </div>
@@ -415,12 +423,12 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
 
       {/* New Link Modal */}
       {showNewLink && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
           <div
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setShowNewLink(false)}
           />
-          <div className="relative z-10 w-full max-w-lg">
+          <div className="relative z-10 w-full max-w-lg animate-in slide-in-from-bottom-4 duration-300">
             <NewLinkForm
               key={formResetKey}
               onSubmit={handleCreateLink}
@@ -432,13 +440,13 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
 
       {/* Password Management Modal */}
       {showPasswordManager && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
           <div
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setShowPasswordManager(false)}
           />
-          <div className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="bg-white rounded-xl shadow-2xl">
+          <div className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-4 duration-300">
+            <div className="bg-white rounded-2xl shadow-2xl">
               <ProjectPasswordManager
                 projectId={project.id}
                 accessToken={accessToken}
@@ -540,17 +548,25 @@ function NewLinkForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6"
+      className="bg-white rounded-2xl shadow-2xl border border-slate-200/60 p-4 sm:p-6"
     >
-      <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3 sm:mb-4">
-        Create New Link
-      </h3>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+          <Link2 className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h3 className="text-lg sm:text-xl font-bold text-slate-900">
+            Create New Link
+          </h3>
+          <p className="text-xs text-slate-600">Set up a trackable link</p>
+        </div>
+      </div>
 
-      <div className="space-y-3 sm:space-y-4">
+      <div className="space-y-3">
         <div>
           <label
             htmlFor="linkTitle"
-            className="block text-xs sm:text-sm font-medium text-slate-700 mb-1"
+            className="block text-sm font-bold text-slate-700 mb-1.5"
           >
             Link Title
           </label>
@@ -559,7 +575,7 @@ function NewLinkForm({
             type="text"
             value={linkTitle}
             onChange={(e) => handleLinkTitleChange(e.target.value)}
-            className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            className="w-full px-3 py-2 text-base border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             placeholder="title"
             required
           />
@@ -571,7 +587,7 @@ function NewLinkForm({
         <div>
           <label
             htmlFor="platform"
-            className="block text-xs sm:text-sm font-medium text-slate-700 mb-1"
+            className="block text-sm font-bold text-slate-700 mb-1.5"
           >
             Platform Name
           </label>
@@ -580,7 +596,7 @@ function NewLinkForm({
             type="text"
             value={platform}
             onChange={(e) => setPlatform(e.target.value)}
-            className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            className="w-full px-3 py-2 text-base border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             placeholder="e.g., Instagram, YouTube, TikTok, Twitter"
             required
           />
@@ -592,7 +608,7 @@ function NewLinkForm({
         <div>
           <label
             htmlFor="destinationUrl"
-            className="block text-xs sm:text-sm font-medium text-slate-700 mb-1"
+            className="block text-sm font-bold text-slate-700 mb-1.5"
           >
             Destination URL
           </label>
@@ -601,7 +617,7 @@ function NewLinkForm({
             type="url"
             value={destinationUrl}
             onChange={(e) => setDestinationUrl(e.target.value)}
-            className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            className="w-full px-3 py-2 text-base border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             placeholder="https://example.com"
             required
           />
@@ -610,7 +626,7 @@ function NewLinkForm({
         <div>
           <label
             htmlFor="shortCode"
-            className="block text-xs sm:text-sm font-medium text-slate-700 mb-1"
+            className="block text-sm font-bold text-slate-700 mb-1.5"
           >
             Short Code
           </label>
@@ -619,7 +635,7 @@ function NewLinkForm({
             type="text"
             value={shortCode}
             readOnly
-            className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed"
+            className="w-full px-3 py-2 text-base border-2 border-slate-300 rounded-xl bg-slate-50 text-slate-600 cursor-not-allowed font-mono"
             placeholder="Auto-generated code"
             required
           />
@@ -631,11 +647,11 @@ function NewLinkForm({
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 mt-4 sm:mt-6">
+      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 mt-4">
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 sm:py-2.5 text-sm sm:text-base rounded-lg transition font-medium disabled:bg-blue-400 disabled:cursor-not-allowed"
+          className="w-full sm:flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-2 text-sm rounded-xl transition-all duration-200 font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02]"
         >
           {isSubmitting ? "Creating..." : "Create Link"}
         </button>
@@ -643,7 +659,7 @@ function NewLinkForm({
           type="button"
           onClick={onCancel}
           disabled={isSubmitting}
-          className="w-full sm:flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 sm:py-2.5 text-sm sm:text-base rounded-lg transition font-medium disabled:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+          className="w-full sm:flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 text-sm rounded-xl transition-all font-semibold disabled:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 shadow-sm hover:shadow-md"
         >
           Cancel
         </button>

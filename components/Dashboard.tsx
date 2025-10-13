@@ -214,8 +214,18 @@ export function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-slate-600">Loading...</div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4 animate-pulse shadow-lg">
+            <FolderOpen className="w-8 h-8 text-white" />
+          </div>
+          <p className="text-slate-700 font-semibold text-lg">
+            Loading dashboard...
+          </p>
+          <p className="text-slate-500 text-sm mt-1">
+            Please wait while we fetch your projects
+          </p>
+        </div>
       </div>
     );
   }
@@ -225,69 +235,72 @@ export function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-3 sm:py-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50">
+      <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200/60 sticky top-0 z-40 shadow-sm">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-5">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                <FolderOpen className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+            <div className="flex items-center space-x-3 sm:space-x-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                <FolderOpen className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
                   Link Tracker
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-600 truncate max-w-[200px] sm:max-w-none">
+                <p className="text-xs sm:text-sm text-slate-600 truncate max-w-[200px] sm:max-w-none font-medium">
                   {user?.email}
                 </p>
               </div>
             </div>
             <button
               onClick={signOut}
-              className="flex items-center space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base text-slate-700 hover:bg-slate-100 rounded-lg transition"
+              className="group flex items-center space-x-2 px-4 sm:px-5 py-2 sm:py-2.5 text-sm sm:text-base text-slate-700 hover:text-red-600 bg-slate-100 hover:bg-red-50 rounded-xl transition-all duration-200 font-medium shadow-sm hover:shadow-md"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-4 h-4 group-hover:rotate-12 transition-transform" />
               <span>Sign Out</span>
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
-        <div className="mb-6 sm:mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0 mb-4 sm:mb-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-6 sm:py-8 lg:py-10">
+        <div className="mb-8 sm:mb-10">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0 mb-6 sm:mb-8">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">
+              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
                 Your Projects
               </h2>
-              <p className="text-sm sm:text-base text-slate-600 mt-1">
+              <p className="text-sm sm:text-base text-slate-600 font-medium">
                 Create and manage your link tracking campaigns
               </p>
             </div>
             <button
               onClick={() => setShowNewProject(true)}
-              className="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg transition font-medium w-full sm:w-auto"
+              className="group flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-5 sm:px-6 py-3 rounded-xl transition-all duration-200 font-semibold shadow-lg hover:shadow-xl w-full sm:w-auto hover:scale-105"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200" />
               <span>New Project</span>
             </button>
           </div>
         </div>
 
         {projects.length === 0 ? (
-          <div className="bg-white rounded-xl border-2 border-dashed border-slate-300 p-6 sm:p-8 lg:p-12 text-center">
-            <FolderOpen className="w-12 h-12 sm:w-16 sm:h-16 text-slate-400 mx-auto mb-3 sm:mb-4" />
-            <h3 className="text-lg sm:text-xl font-semibold text-slate-900 mb-2">
+          <div className="bg-white rounded-2xl border-2 border-dashed border-slate-300 p-8 sm:p-12 lg:p-16 text-center shadow-sm">
+            <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl mb-6">
+              <FolderOpen className="w-10 h-10 sm:w-12 sm:h-12 text-blue-600" />
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3">
               No projects yet
             </h3>
-            <p className="text-sm sm:text-base text-slate-600 mb-4 sm:mb-6">
-              Create your first project to start tracking links
+            <p className="text-sm sm:text-base text-slate-600 mb-6 sm:mb-8 max-w-md mx-auto">
+              Create your first project to start tracking links and analyzing
+              your campaign performance
             </p>
             <button
               onClick={() => setShowNewProject(true)}
-              className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition font-medium"
+              className="group inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-4 rounded-xl transition-all duration-200 font-semibold shadow-lg hover:shadow-xl hover:scale-105"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200" />
               <span>Create Project</span>
             </button>
           </div>
@@ -301,12 +314,12 @@ export function Dashboard() {
       </main>
 
       {showNewProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
           <div
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setShowNewProject(false)}
           />
-          <div className="relative z-10 w-full max-w-lg">
+          <div className="relative z-10 w-full max-w-lg animate-in slide-in-from-bottom-4 duration-300">
             <NewProjectForm
               onSubmit={handleCreateProject}
               onCancel={() => setShowNewProject(false)}
@@ -401,17 +414,27 @@ function NewProjectForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6"
+      className="bg-white rounded-2xl shadow-2xl border border-slate-200/60 p-4 sm:p-6"
     >
-      <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3 sm:mb-4">
-        Create New Project
-      </h3>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+          <Plus className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h3 className="text-lg sm:text-xl font-bold text-slate-900">
+            Create New Project
+          </h3>
+          <p className="text-xs text-slate-600">
+            Set up a new tracking campaign
+          </p>
+        </div>
+      </div>
 
-      <div className="space-y-3 sm:space-y-4">
+      <div className="space-y-3">
         <div>
           <label
             htmlFor="name"
-            className="block text-xs sm:text-sm font-medium text-slate-700 mb-1"
+            className="block text-sm font-bold text-slate-700 mb-1.5"
           >
             Project Name
           </label>
@@ -420,7 +443,7 @@ function NewProjectForm({
             type="text"
             value={name}
             onChange={(e) => handleNameChange(e.target.value)}
-            className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            className="w-full px-3 py-3 text-base border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             placeholder="e.g., Website Campaign, App Launch"
             required
           />
@@ -429,7 +452,7 @@ function NewProjectForm({
         <div>
           <label
             htmlFor="slug"
-            className="block text-xs sm:text-sm font-medium text-slate-700 mb-1"
+            className="block text-sm font-bold text-slate-700 mb-1.5"
           >
             Project Slug
           </label>
@@ -439,7 +462,7 @@ function NewProjectForm({
               type="text"
               value={slug}
               readOnly
-              className="flex-1 px-3 sm:px-4 py-2 text-sm sm:text-base border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed"
+              className="flex-1 px-3 py-3 text-base border-2 border-slate-300 rounded-xl bg-slate-50 text-slate-600 cursor-not-allowed font-mono"
               placeholder="Auto-generated letter"
               required
             />
@@ -447,7 +470,7 @@ function NewProjectForm({
               type="button"
               onClick={handleGenerateSlug}
               disabled={isGeneratingSlug}
-              className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+              className="px-4 py-2 text-sm bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap"
             >
               {isGeneratingSlug ? "..." : "New"}
             </button>
@@ -462,26 +485,27 @@ function NewProjectForm({
         <div>
           <label
             htmlFor="description"
-            className="block text-xs sm:text-sm font-medium text-slate-700 mb-1"
+            className="block text-sm font-bold text-slate-700 mb-1.5"
           >
-            Description (Optional)
+            Description{" "}
+            <span className="text-slate-400 font-normal">(Optional)</span>
           </label>
           <textarea
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none"
-            rows={3}
+            className="w-full px-3 py-3 text-base border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none transition-all"
+            rows={2}
             placeholder="Brief description of this project"
           />
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 mt-4 sm:mt-6">
+      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 mt-4">
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 sm:py-2.5 text-sm sm:text-base rounded-lg transition font-medium disabled:bg-blue-400 disabled:cursor-not-allowed"
+          className="w-full sm:flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-2 text-sm rounded-xl transition-all duration-200 font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02]"
         >
           {isSubmitting ? "Creating..." : "Create Project"}
         </button>
@@ -489,7 +513,7 @@ function NewProjectForm({
           type="button"
           onClick={onCancel}
           disabled={isSubmitting}
-          className="w-full sm:flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 sm:py-2.5 text-sm sm:text-base rounded-lg transition font-medium disabled:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+          className="w-full sm:flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 text-sm rounded-xl transition-all font-semibold disabled:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 shadow-sm hover:shadow-md"
         >
           Cancel
         </button>
