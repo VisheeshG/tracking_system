@@ -16,6 +16,7 @@ import { Analytics } from "./Analytics";
 import { SocialShare } from "./SocialShare";
 import { ProjectPasswordManager } from "./ProjectPasswordManager";
 import { generateUniqueShortCode } from "@/lib/generators";
+import { canOpenInNativeApp } from "@/lib/mobile-app-redirect";
 import toast from "react-hot-toast";
 
 interface ProjectDetailsProps {
@@ -131,7 +132,8 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
     linkTitle: string,
     platform: string,
     destinationUrl: string,
-    shortCode: string
+    shortCode: string,
+    openAppOnMobile: boolean
   ) => {
     try {
       // Check if destination URL already exists in this project
@@ -182,6 +184,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
           destination_url: destinationUrl,
           short_code: finalShortCode,
           submission_number: submissionNumber,
+          open_app_on_mobile: openAppOnMobile,
         })
         .select()
         .single();
@@ -483,7 +486,8 @@ function NewLinkForm({
     linkTitle: string,
     platform: string,
     destinationUrl: string,
-    shortCode: string
+    shortCode: string,
+    openAppOnMobile: boolean
   ) => Promise<boolean>;
   onCancel: () => void;
 }) {
@@ -491,6 +495,7 @@ function NewLinkForm({
   const [platform, setPlatform] = useState("");
   const [destinationUrl, setDestinationUrl] = useState("");
   const [shortCode, setShortCode] = useState("");
+  const [openAppOnMobile, setOpenAppOnMobile] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -537,9 +542,22 @@ function NewLinkForm({
       return;
     }
 
+    if (openAppOnMobile && !canOpenInNativeApp(destinationUrl)) {
+      toast.error(
+        "This URL is not from a supported app platform. Use YouTube, Instagram, TikTok, X/Twitter, Facebook, or Spotify links."
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await onSubmit(linkTitle, platform, destinationUrl, shortCode);
+      await onSubmit(
+        linkTitle,
+        platform,
+        destinationUrl,
+        shortCode,
+        openAppOnMobile
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -618,9 +636,38 @@ function NewLinkForm({
             value={destinationUrl}
             onChange={(e) => setDestinationUrl(e.target.value)}
             className="w-full px-3 py-2 text-base border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-            placeholder="https://example.com"
+            placeholder="https://www.youtube.com/watch?v=..."
             required
           />
+        </div>
+
+        <div className="rounded-xl border-2 border-slate-200 p-3">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={openAppOnMobile}
+              onChange={(e) => setOpenAppOnMobile(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>
+              <span className="block text-sm font-bold text-slate-700">
+                Open in native app on mobile
+              </span>
+              <span className="block text-xs text-slate-500 mt-0.5">
+                On phones, opens the matching app (e.g. YouTube podcast in the
+                YouTube app, Instagram posts in Instagram) instead of the
+                in-app browser. Works with YouTube, Instagram, TikTok, X,
+                Facebook, and Spotify URLs.
+              </span>
+              {destinationUrl.trim() &&
+                openAppOnMobile &&
+                !canOpenInNativeApp(destinationUrl) && (
+                  <span className="block text-xs text-amber-600 mt-1 font-medium">
+                    This destination URL is not from a supported platform.
+                  </span>
+                )}
+            </span>
+          </label>
         </div>
 
         <div>

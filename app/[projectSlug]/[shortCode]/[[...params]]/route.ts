@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  buildMobileAppRedirectHtml,
+  resolveMobileAppRedirect,
+} from "@/lib/mobile-app-redirect";
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -81,7 +85,9 @@ export async function GET(
     // Get link
     const { data: linkData } = await supabase
       .from("links")
-      .select("id, destination_url, platform, submission_number")
+      .select(
+        "id, destination_url, platform, submission_number, open_app_on_mobile"
+      )
       .eq("short_code", shortCode)
       .eq("project_id", projectData.id)
       .single();
@@ -218,7 +224,28 @@ export async function GET(
       });
     }
 
-    // Now redirect after tracking is complete
+    const isMobileDevice =
+      deviceType === "mobile" || deviceType === "tablet";
+
+    if (linkData.open_app_on_mobile && isMobileDevice) {
+      const appTargets = resolveMobileAppRedirect(
+        linkData.destination_url,
+        os
+      );
+      if (
+        appTargets &&
+        (appTargets.appUrl || appTargets.androidIntent)
+      ) {
+        return new NextResponse(buildMobileAppRedirectHtml(appTargets), {
+          status: 200,
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+          },
+        });
+      }
+    }
+
     return NextResponse.redirect(linkData.destination_url, 307);
   } catch (error) {
     console.error("Redirect error:", error);

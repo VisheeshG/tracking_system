@@ -36,6 +36,7 @@ export type Link = {
   link_title: string;
   platform: string;
   submission_number: string | null;
+  open_app_on_mobile?: boolean;
   created_at: string;
   updated_at: string;
 };

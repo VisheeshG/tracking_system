@@ -97,6 +97,11 @@ export function LinkList({
                     <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium self-start">
                       {link.platform}
                     </span>
+                    {link.open_app_on_mobile && (
+                      <span className="px-2 py-1 bg-violet-100 text-violet-700 text-xs rounded-full font-medium self-start">
+                        Opens in app on mobile
+                      </span>
+                    )}
                   </div>
 
                   <div className="space-y-2">
