@@ -78,16 +78,22 @@ export function Dashboard() {
         return false;
       }
 
+      const trimmedSlug = slug.trim();
+      if (!trimmedSlug) {
+        toast.error("Project slug is required");
+        return false;
+      }
+
       // Check if slug already exists (across all users)
       const { data: existingSlug, error: slugError } = await supabase
         .from("projects")
         .select("id")
-        .eq("slug", slug)
+        .eq("slug", trimmedSlug)
         .single();
 
       if (!slugError && existingSlug) {
         toast.error(
-          `Project slug "${slug}" is already taken. Click "New" to generate a different one.`,
+          `Project slug "${trimmedSlug}" is already taken. Choose a different slug.`,
           { duration: 5000 }
         );
         return false;
@@ -99,7 +105,7 @@ export function Dashboard() {
           user_id: user.id,
           name: trimmedName,
           description,
-          slug,
+          slug: trimmedSlug,
         })
         .select()
         .single();
@@ -108,7 +114,7 @@ export function Dashboard() {
         // Check if error is due to duplicate slug constraint
         if (error.code === "23505" && error.message.includes("slug")) {
           toast.error(
-            `Project slug "${slug}" is already taken. Click "New" to generate a different one.`,
+            `Project slug "${trimmedSlug}" is already taken. Choose a different slug.`,
             { duration: 5000 }
           );
           return false;
@@ -345,6 +351,7 @@ function NewProjectForm({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [slug, setSlug] = useState("");
+  const [slugMode, setSlugMode] = useState<"auto" | "custom">("auto");
   const [isGeneratingSlug, setIsGeneratingSlug] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -364,6 +371,8 @@ function NewProjectForm({
   const handleNameChange = (value: string) => {
     setName(value);
 
+    if (slugMode !== "auto") return;
+
     // Clear existing timeout
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -382,6 +391,18 @@ function NewProjectForm({
     }
   };
 
+  const handleSlugModeChange = (mode: "auto" | "custom") => {
+    setSlugMode(mode);
+    if (mode === "custom") {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      setSlug("");
+    } else {
+      handleGenerateSlug();
+    }
+  };
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -395,10 +416,11 @@ function NewProjectForm({
     e.preventDefault();
     if (isSubmitting) return; // Prevent duplicate submissions
 
-    // Validate that slug is not empty
     if (!slug.trim()) {
       toast.error(
-        "Please wait for the project slug to be generated before submitting."
+        slugMode === "auto"
+          ? "Please wait for the project slug to be generated before submitting."
+          : "Please enter a custom project slug."
       );
       return;
     }
@@ -450,35 +472,80 @@ function NewProjectForm({
         </div>
 
         <div>
-          <label
-            htmlFor="slug"
-            className="block text-sm font-bold text-slate-700 mb-1.5"
-          >
+          <span className="block text-sm font-bold text-slate-700 mb-1.5">
             Project Slug
-          </label>
+          </span>
+          <div className="flex rounded-xl border-2 border-slate-300 p-0.5 mb-2">
+            <button
+              type="button"
+              onClick={() => handleSlugModeChange("auto")}
+              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                slugMode === "auto"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              Auto-generate
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSlugModeChange("custom")}
+              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                slugMode === "custom"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              Custom
+            </button>
+          </div>
           <div className="flex space-x-2">
             <input
               id="slug"
               type="text"
               value={slug}
-              readOnly
-              className="flex-1 px-3 py-3 text-base border-2 border-slate-300 rounded-xl bg-slate-50 text-slate-600 cursor-not-allowed font-mono"
-              placeholder="Auto-generated letter"
+              onChange={
+                slugMode === "custom"
+                  ? (e) => setSlug(e.target.value)
+                  : undefined
+              }
+              readOnly={slugMode === "auto"}
+              className={`flex-1 px-3 py-3 text-base border-2 border-slate-300 rounded-xl font-mono outline-none transition-all ${
+                slugMode === "auto"
+                  ? "bg-slate-50 text-slate-600 cursor-not-allowed"
+                  : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              }`}
+              placeholder={
+                slugMode === "auto"
+                  ? "Auto-generated letter"
+                  : "e.g., my-campaign, launch2026"
+              }
               required
             />
-            <button
-              type="button"
-              onClick={handleGenerateSlug}
-              disabled={isGeneratingSlug}
-              className="px-4 py-2 text-sm bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap"
-            >
-              {isGeneratingSlug ? "..." : "New"}
-            </button>
+            {slugMode === "auto" && (
+              <button
+                type="button"
+                onClick={handleGenerateSlug}
+                disabled={isGeneratingSlug}
+                className="px-4 py-2 text-sm bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap"
+              >
+                {isGeneratingSlug ? "..." : "New"}
+              </button>
+            )}
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Auto-generated when you type a project name (starts with single
-            letters like &quot;a&quot;, then &quot;a12&quot;, then
-            &quot;ab1&quot;, etc.). Click &quot;New&quot; if already taken.
+            {slugMode === "auto" ? (
+              <>
+                Auto-generated when you type a project name (starts with single
+                letters like &quot;a&quot;, then &quot;a12&quot;, then
+                &quot;ab1&quot;, etc.). Click &quot;New&quot; if already taken.
+              </>
+            ) : (
+              <>
+                Enter any slug you want. It must be unique and is used in your
+                tracking URLs (e.g. /your-slug/...).
+              </>
+            )}
           </p>
         </div>
 
