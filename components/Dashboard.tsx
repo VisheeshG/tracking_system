@@ -193,81 +193,35 @@ export function Dashboard() {
 
   const handleDeleteProject = async (projectId: string) => {
     try {
-      console.log("Starting deletion for project:", projectId);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      // First, get all links for this project
-      const { data: links, error: linksError } = await supabase
-        .from("links")
-        .select("id")
-        .eq("project_id", projectId);
-
-      if (linksError) {
-        console.error("Error fetching links:", linksError);
-        throw linksError;
+      if (!session?.access_token) {
+        toast.error("You must be signed in to delete a project");
+        return;
       }
 
-      console.log(`Found ${links?.length || 0} links for project`);
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
-      // Delete all link_clicks for each link
-      if (links && links.length > 0) {
-        const linkIds = links.map((link) => link.id);
-        console.log("Deleting link_clicks for link IDs:", linkIds);
+      const result = await response.json().catch(() => ({}));
 
-        const { error: clicksError, count: clicksCount } = await supabase
-          .from("link_clicks")
-          .delete({ count: "exact" })
-          .in("link_id", linkIds);
-
-        if (clicksError) {
-          console.error("Error deleting link_clicks:", clicksError);
-          throw clicksError;
-        }
-        console.log(`Deleted ${clicksCount} link_clicks`);
-
-        // Delete all links for this project
-        console.log("Deleting links for project:", projectId);
-        const { error: deleteLinksError, count: linksCount } = await supabase
-          .from("links")
-          .delete({ count: "exact" })
-          .eq("project_id", projectId);
-
-        if (deleteLinksError) {
-          console.error("Error deleting links:", deleteLinksError);
-          throw deleteLinksError;
-        }
-        console.log(`Deleted ${linksCount} links`);
+      if (!response.ok) {
+        throw new Error(
+          typeof result.error === "string"
+            ? result.error
+            : "Error deleting project"
+        );
       }
 
-      // Delete all project passwords
-      console.log("Deleting project passwords for project:", projectId);
-      const { error: passwordsError, count: passwordsCount } = await supabase
-        .from("project_passwords")
-        .delete({ count: "exact" })
-        .eq("project_id", projectId);
-
-      if (passwordsError) {
-        console.error("Error deleting passwords:", passwordsError);
-        throw passwordsError;
-      }
-      console.log(`Deleted ${passwordsCount} project_passwords`);
-
-      // Finally, delete the project itself
-      console.log("Deleting project:", projectId);
-      const { error, count: projectCount } = await supabase
-        .from("projects")
-        .delete({ count: "exact" })
-        .eq("id", projectId);
-
-      if (error) {
-        console.error("Error deleting project:", error);
-        throw error;
-      }
-      console.log(`Deleted ${projectCount} project(s)`);
-
-      setProjects(projects.filter((p) => p.id !== projectId));
-      await loadDashboardStats(
-        projects.filter((p) => p.id !== projectId).map((p) => p.id)
-      );
+      const remaining = projects.filter((p) => p.id !== projectId);
+      setProjects(remaining);
+      await loadDashboardStats(remaining.map((p) => p.id));
       toast.success("Project and all associated data deleted successfully");
     } catch (error: unknown) {
       console.error("Error deleting project:", error);
