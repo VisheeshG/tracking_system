@@ -50,6 +50,7 @@ export type LinkClick = {
   ip_address: string | null;
   user_agent: string | null;
   country: string | null;
+  state: string | null;
   city: string | null;
   device_type: string | null;
   browser: string | null;

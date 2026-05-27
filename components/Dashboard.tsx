@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase, Project } from "@/lib/supabase";
 import { ProjectList } from "./ProjectList";
+import { DashboardStatsCards } from "./DashboardStatsCards";
+import { TitleSearchBar } from "./TitleSearchBar";
+import { matchesTitleQuery } from "@/lib/search";
 import { generateUniqueProjectSlug } from "@/lib/generators";
 import { LogOut, Plus, FolderOpen } from "lucide-react";
 import toast from "react-hot-toast";
@@ -14,11 +17,61 @@ export function Dashboard() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [totalLinks, setTotalLinks] = useState(0);
+  const [totalClicks, setTotalClicks] = useState(0);
   const [showNewProject, setShowNewProject] = useState(false);
+  const [projectSearch, setProjectSearch] = useState("");
+
+  const filteredProjects = useMemo(
+    () =>
+      projects.filter((p) => matchesTitleQuery(projectSearch, p.name)),
+    [projects, projectSearch]
+  );
+
+  const loadDashboardStats = useCallback(async (projectIds: string[]) => {
+    if (projectIds.length === 0) {
+      setTotalLinks(0);
+      setTotalClicks(0);
+      setStatsLoading(false);
+      return;
+    }
+
+    try {
+      const { data: links, error: linksError } = await supabase
+        .from("links")
+        .select("id")
+        .in("project_id", projectIds);
+
+      if (linksError) throw linksError;
+
+      const linkCount = links?.length ?? 0;
+      setTotalLinks(linkCount);
+
+      if (!links || links.length === 0) {
+        setTotalClicks(0);
+        return;
+      }
+
+      const linkIds = links.map((l) => l.id);
+      const { count, error: clicksError } = await supabase
+        .from("link_clicks")
+        .select("*", { count: "exact", head: true })
+        .in("link_id", linkIds);
+
+      if (clicksError) throw clicksError;
+      setTotalClicks(count ?? 0);
+    } catch (error) {
+      console.error("Error loading dashboard stats:", error);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
 
   const loadProjects = useCallback(async () => {
     if (!user) return;
 
+    setStatsLoading(true);
     try {
       const { data, error } = await supabase
         .from("projects")
@@ -27,13 +80,16 @@ export function Dashboard() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setProjects(data || []);
+      const projectList = data || [];
+      setProjects(projectList);
+      await loadDashboardStats(projectList.map((p) => p.id));
     } catch (error) {
       console.error("Error loading projects:", error);
+      setStatsLoading(false);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, loadDashboardStats]);
 
   useEffect(() => {
     loadProjects();
@@ -209,6 +265,9 @@ export function Dashboard() {
       console.log(`Deleted ${projectCount} project(s)`);
 
       setProjects(projects.filter((p) => p.id !== projectId));
+      await loadDashboardStats(
+        projects.filter((p) => p.id !== projectId).map((p) => p.id)
+      );
       toast.success("Project and all associated data deleted successfully");
     } catch (error: unknown) {
       console.error("Error deleting project:", error);
@@ -270,6 +329,12 @@ export function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-6 sm:py-8 lg:py-10">
+      <DashboardStatsCards
+              totalProjects={projects.length}
+              totalLinks={totalLinks}
+              totalClicks={totalClicks}
+              loading={statsLoading}
+            />
         <div className="mb-8 sm:mb-10">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0 mb-6 sm:mb-8">
             <div>
@@ -311,11 +376,35 @@ export function Dashboard() {
             </button>
           </div>
         ) : (
-          <ProjectList
-            projects={projects}
-            onSelectProject={handleSelectProject}
-            onDeleteProject={handleDeleteProject}
-          />
+          <>
+            <TitleSearchBar
+              value={projectSearch}
+              onChange={setProjectSearch}
+              placeholder="Search projects by title..."
+              className="mb-6 max-w-md"
+            />
+        
+            {filteredProjects.length === 0 ? (
+              <div className="bg-white rounded-xl border border-slate-200 p-8 text-center shadow-sm">
+                <p className="text-slate-600">
+                  No projects match &quot;{projectSearch.trim()}&quot;.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setProjectSearch("")}
+                  className="mt-3 text-sm font-semibold text-blue-600 hover:text-blue-700"
+                >
+                  Clear search
+                </button>
+              </div>
+            ) : (
+              <ProjectList
+                projects={filteredProjects}
+                onSelectProject={handleSelectProject}
+                onDeleteProject={handleDeleteProject}
+              />
+            )}
+          </>
         )}
       </main>
 
@@ -325,7 +414,7 @@ export function Dashboard() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setShowNewProject(false)}
           />
-          <div className="relative z-10 w-full max-w-lg animate-in slide-in-from-bottom-4 duration-300">
+          <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-4 duration-300">
             <NewProjectForm
               onSubmit={handleCreateProject}
               onCancel={() => setShowNewProject(false)}

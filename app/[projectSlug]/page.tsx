@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { supabase, Project, Link } from "@/lib/supabase";
 import { LinkList } from "@/components/LinkList";
+import { TitleSearchBar } from "@/components/TitleSearchBar";
+import { matchesTitleQuery } from "@/lib/search";
 import { Analytics } from "@/components/Analytics";
 import { PasswordVerificationModal } from "@/components/PasswordVerificationModal";
 import { Link2, MousePointerClick, TrendingUp } from "lucide-react";
@@ -20,8 +22,14 @@ export default function PublicProjectPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [totalClicks, setTotalClicks] = useState(0);
   const [platformCount, setPlatformCount] = useState(0);
+  const [linkSearch, setLinkSearch] = useState("");
 
   const projectSlug = params.projectSlug as string;
+
+  const filteredLinks = useMemo(
+    () => links.filter((l) => matchesTitleQuery(linkSearch, l.link_title)),
+    [links, linkSearch]
+  );
 
   // Load project info and check password requirement on mount
   useEffect(() => {
@@ -357,19 +365,42 @@ export default function PublicProjectPage() {
             <p className="text-slate-600">This project has no public links.</p>
           </div>
         ) : (
-          <LinkList
-            links={links}
-            onSelectLink={(link) => {
-              setSelectedLinkId(link.id);
-              const url = new URL(window.location.href);
-              url.searchParams.set("link_id", link.id);
-              window.history.replaceState({}, "", url.toString());
-            }}
-            onDeleteLink={() => {}}
-            projectSlug={project.slug}
-            readOnly
-            enableSelectInReadOnly
-          />
+          <>
+            <TitleSearchBar
+              value={linkSearch}
+              onChange={setLinkSearch}
+              placeholder="Search links by title..."
+              className="mb-6 max-w-md"
+            />
+            {filteredLinks.length === 0 ? (
+              <div className="bg-white rounded-xl border border-slate-200 p-8 text-center shadow-sm">
+                <p className="text-slate-600">
+                  No links match &quot;{linkSearch.trim()}&quot;.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setLinkSearch("")}
+                  className="mt-3 text-sm font-semibold text-blue-600 hover:text-blue-700"
+                >
+                  Clear search
+                </button>
+              </div>
+            ) : (
+              <LinkList
+                links={filteredLinks}
+                onSelectLink={(link) => {
+                  setSelectedLinkId(link.id);
+                  const url = new URL(window.location.href);
+                  url.searchParams.set("link_id", link.id);
+                  window.history.replaceState({}, "", url.toString());
+                }}
+                onDeleteLink={() => {}}
+                projectSlug={project.slug}
+                readOnly
+                enableSelectInReadOnly
+              />
+            )}
+          </>
         )}
       </div>
     </div>

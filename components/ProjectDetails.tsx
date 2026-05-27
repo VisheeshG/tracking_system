@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Project, Link, supabase } from "@/lib/supabase";
 import {
@@ -12,6 +12,8 @@ import {
   Shield,
 } from "lucide-react";
 import { LinkList } from "./LinkList";
+import { TitleSearchBar } from "./TitleSearchBar";
+import { matchesTitleQuery } from "@/lib/search";
 import { Analytics } from "./Analytics";
 import { SocialShare } from "./SocialShare";
 import { ProjectPasswordManager } from "./ProjectPasswordManager";
@@ -34,6 +36,15 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
   const [projectUrl, setProjectUrl] = useState("");
   const [accessToken, setAccessToken] = useState<string>("");
   const [formResetKey, setFormResetKey] = useState(0);
+  const [linkSearch, setLinkSearch] = useState("");
+
+  const filteredLinks = useMemo(
+    () =>
+      links.filter((l) => matchesTitleQuery(linkSearch, l.link_title)),
+    [links, linkSearch]
+  );
+  const newLinkBackdropPointerDown = useRef(false);
+  const passwordBackdropPointerDown = useRef(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -415,12 +426,35 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
             </button>
           </div>
         ) : (
-          <LinkList
-            links={links}
-            onSelectLink={handleSelectLink}
-            onDeleteLink={handleDeleteLink}
-            projectSlug={project.slug}
-          />
+          <>
+            <TitleSearchBar
+              value={linkSearch}
+              onChange={setLinkSearch}
+              placeholder="Search links by title..."
+              className="mb-6 max-w-md"
+            />
+            {filteredLinks.length === 0 ? (
+              <div className="bg-white rounded-xl border border-slate-200 p-8 text-center shadow-sm">
+                <p className="text-slate-600">
+                  No links match &quot;{linkSearch.trim()}&quot;.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setLinkSearch("")}
+                  className="mt-3 text-sm font-semibold text-blue-600 hover:text-blue-700"
+                >
+                  Clear search
+                </button>
+              </div>
+            ) : (
+              <LinkList
+                links={filteredLinks}
+                onSelectLink={handleSelectLink}
+                onDeleteLink={handleDeleteLink}
+                projectSlug={project.slug}
+              />
+            )}
+          </>
         )}
       </div>
 
@@ -429,9 +463,20 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setShowNewLink(false)}
+            onMouseDown={(e) => {
+              newLinkBackdropPointerDown.current = e.target === e.currentTarget;
+            }}
+            onClick={(e) => {
+              if (
+                e.target === e.currentTarget &&
+                newLinkBackdropPointerDown.current
+              ) {
+                setShowNewLink(false);
+              }
+              newLinkBackdropPointerDown.current = false;
+            }}
           />
-          <div className="relative z-10 w-full max-w-lg animate-in slide-in-from-bottom-4 duration-300">
+          <div className="relative z-10 w-full max-w-lg max-h-[95vh] overflow-y-auto animate-in slide-in-from-bottom-4 duration-300">
             <NewLinkForm
               key={formResetKey}
               onSubmit={handleCreateLink}
@@ -446,7 +491,19 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setShowPasswordManager(false)}
+            onMouseDown={(e) => {
+              passwordBackdropPointerDown.current =
+                e.target === e.currentTarget;
+            }}
+            onClick={(e) => {
+              if (
+                e.target === e.currentTarget &&
+                passwordBackdropPointerDown.current
+              ) {
+                setShowPasswordManager(false);
+              }
+              passwordBackdropPointerDown.current = false;
+            }}
           />
           <div className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-4 duration-300">
             <div className="bg-white rounded-2xl shadow-2xl">

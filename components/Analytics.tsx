@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link, LinkClick, supabase } from "@/lib/supabase";
 import {
   ArrowLeft,
@@ -13,14 +13,22 @@ import {
   Eye,
   X,
   Filter,
+  Download,
+  FileText,
+  FileSpreadsheet,
+  ChevronDown,
 } from "lucide-react";
 import { ClicksAnalyticsChart } from "./ClicksAnalyticsChart";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 const FILTER_ALL = "all";
 
 type ClickFilters = {
   submission: string;
   country: string;
+  state: string;
   city: string;
   device: string;
   browser: string;
@@ -29,6 +37,7 @@ type ClickFilters = {
 const DEFAULT_CLICK_FILTERS: ClickFilters = {
   submission: FILTER_ALL,
   country: FILTER_ALL,
+  state: FILTER_ALL,
   city: FILTER_ALL,
   device: FILTER_ALL,
   browser: FILTER_ALL,
@@ -53,6 +62,9 @@ function matchesClickFilters(click: LinkClick, filters: ClickFilters): boolean {
     return false;
   }
   if (filters.country !== FILTER_ALL && click.country !== filters.country) {
+    return false;
+  }
+  if (filters.state !== FILTER_ALL && click.state !== filters.state) {
     return false;
   }
   if (filters.city !== FILTER_ALL && click.city !== filters.city) {
@@ -96,6 +108,7 @@ function computeAnalyticsFromClicks(
     clicksByCreator: {},
     clicksBySubmission: {},
     clicksByCountry: {},
+    clicksByState: {},
     clicksByCity: {},
     clicksByDevice: {},
     clicksByBrowser: {},
@@ -123,6 +136,11 @@ function computeAnalyticsFromClicks(
     if (click.country) {
       analyticsData.clicksByCountry[click.country] =
         (analyticsData.clicksByCountry[click.country] || 0) + 1;
+    }
+
+    if (click.state) {
+      analyticsData.clicksByState[click.state] =
+        (analyticsData.clicksByState[click.state] || 0) + 1;
     }
 
     if (click.city) {
@@ -170,16 +188,19 @@ function computeAnalyticsFromClicks(
 
 function extractFilterOptions(
   clicks: LinkClick[],
-  countryFilter: string
+  countryFilter: string,
+  stateFilter: string
 ): {
   submissions: string[];
   countries: string[];
+  states: string[];
   cities: string[];
   devices: string[];
   browsers: string[];
 } {
   const submissions = new Set<string>();
   const countries = new Set<string>();
+  const states = new Set<string>();
   const cities = new Set<string>();
   const devices = new Set<string>();
   const browsers = new Set<string>();
@@ -188,8 +209,15 @@ function extractFilterOptions(
     if (click.submission_number) submissions.add(click.submission_number);
     if (click.country) countries.add(click.country);
     if (
-      click.city &&
+      click.state &&
       (countryFilter === FILTER_ALL || click.country === countryFilter)
+    ) {
+      states.add(click.state);
+    }
+    if (
+      click.city &&
+      (countryFilter === FILTER_ALL || click.country === countryFilter) &&
+      (stateFilter === FILTER_ALL || click.state === stateFilter)
     ) {
       cities.add(click.city);
     }
@@ -200,6 +228,7 @@ function extractFilterOptions(
   return {
     submissions: sortSubmissionValues([...submissions]),
     countries: [...countries].sort((a, b) => a.localeCompare(b)),
+    states: [...states].sort((a, b) => a.localeCompare(b)),
     cities: [...cities].sort((a, b) => a.localeCompare(b)),
     devices: [...devices].sort((a, b) => a.localeCompare(b)),
     browsers: [...browsers].sort((a, b) => a.localeCompare(b)),
@@ -293,6 +322,7 @@ interface AnalyticsData {
   clicksByCreator: Record<string, number>;
   clicksBySubmission: Record<string, number>;
   clicksByCountry: Record<string, number>;
+  clicksByState: Record<string, number>;
   clicksByCity: Record<string, number>;
   clicksByDevice: Record<string, number>;
   clicksByBrowser: Record<string, number>;
@@ -329,6 +359,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
     totalClicks: number;
     clicksBySubmission: Record<string, number>;
     clicksByCountry: Record<string, number>;
+    clicksByState: Record<string, number>;
     clicksByCity: Record<string, number>;
     clicksByDevice: Record<string, number>;
     clicksByBrowser: Record<string, number>;
@@ -338,6 +369,8 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
     column: CreatorTableSortColumn;
     direction: SortDirection;
   }>({ column: "lastClick", direction: "desc" });
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement | null>(null);
 
   const loadAnalytics = useCallback(async () => {
     try {
@@ -360,9 +393,23 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
     loadAnalytics();
   }, [loadAnalytics]);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        exportMenuRef.current &&
+        !exportMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsExportMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const filterOptions = useMemo(
-    () => extractFilterOptions(allClicks, clickFilters.country),
-    [allClicks, clickFilters.country]
+    () => extractFilterOptions(allClicks, clickFilters.country, clickFilters.state),
+    [allClicks, clickFilters.country, clickFilters.state]
   );
 
   const filteredClicks = useMemo(
@@ -380,6 +427,295 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
       ),
     [filteredClicks, link, startDate, endDate]
   );
+
+  const exportRows = useMemo(
+    () =>
+      data.filteredClicks.map((click, index) => ({
+        "S.No": index + 1,
+        "Clicked At": click.clicked_at
+          ? new Date(click.clicked_at).toLocaleString()
+          : "N/A",
+        Creator: click.creator_username || "N/A",
+        Submission: click.submission_number || "N/A",
+        Country: click.country || "N/A",
+        State: click.state || "N/A",
+        City: click.city || "N/A",
+        Device: click.device_type || "N/A",
+        Browser: click.browser || "N/A",
+      })),
+    [data.filteredClicks]
+  );
+
+  const summarySections = useMemo(() => {
+    const sortEntriesForSection = (
+      sectionTitle: string,
+      record: Record<string, number>
+    ) => {
+      const entries = Object.entries(record);
+
+      // Keep ordering consistent with the on-screen StatsCard.
+      if (sectionTitle === "Clicks by Submission") {
+        return entries.sort((a, b) => {
+          const aIsNumeric = !isNaN(Number(a[0]));
+          const bIsNumeric = !isNaN(Number(b[0]));
+
+          if (aIsNumeric && bIsNumeric) return Number(a[0]) - Number(b[0]);
+          if (aIsNumeric) return -1;
+          if (bIsNumeric) return 1;
+          return a[0].localeCompare(b[0]);
+        });
+      }
+
+      return entries.sort((a, b) => b[1] - a[1]);
+    };
+
+    return [
+      {
+        title: "Clicks by Link Title",
+        entries: sortEntriesForSection("Clicks by Link Title", data.clicksByLinkTitle),
+      },
+      {
+        title: "Clicks by Creator",
+        entries: sortEntriesForSection("Clicks by Creator", data.clicksByCreator),
+      },
+      {
+        title: "Clicks by Submission",
+        entries: sortEntriesForSection("Clicks by Submission", data.clicksBySubmission),
+      },
+      {
+        title: "Clicks by Country",
+        entries: sortEntriesForSection("Clicks by Country", data.clicksByCountry),
+      },
+      {
+        title: "Clicks by State",
+        entries: sortEntriesForSection("Clicks by State", data.clicksByState),
+      },
+      {
+        title: "Clicks by City",
+        entries: sortEntriesForSection("Clicks by City", data.clicksByCity),
+      },
+      {
+        title: "Clicks by Device",
+        entries: sortEntriesForSection("Clicks by Device", data.clicksByDevice),
+      },
+      {
+        title: "Clicks by Browser",
+        entries: sortEntriesForSection("Clicks by Browser", data.clicksByBrowser),
+      },
+    ];
+  }, [
+    data.clicksByBrowser,
+    data.clicksByCity,
+    data.clicksByCountry,
+    data.clicksByState,
+    data.clicksByCreator,
+    data.clicksByDevice,
+    data.clicksByLinkTitle,
+    data.clicksBySubmission,
+  ]);
+
+  const summaryRowsFlat = useMemo(() => {
+    const rows: Array<{
+      Section: string;
+      Rank: number;
+      Label: string;
+      Clicks: number;
+    }> = [];
+
+    for (const section of summarySections) {
+      section.entries.forEach(([label, count], idx) => {
+        rows.push({
+          Section: section.title,
+          Rank: idx + 1,
+          Label: label || "Unknown",
+          Clicks: count,
+        });
+      });
+    }
+
+    return rows;
+  }, [summarySections]);
+
+  const weeklyRows = useMemo(
+    () =>
+      data.clicksByWeek.map((row, index) => {
+        const date = new Date(startDate);
+        date.setDate(date.getDate() + index);
+        return {
+          Week: date.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          }),
+        Clicks: row.clicks,
+        };
+      }),
+    [data.clicksByWeek, startDate]
+  );
+
+  const canExport =
+    exportRows.length > 0 ||
+    summaryRowsFlat.length > 0 ||
+    weeklyRows.length > 0;
+
+  const getExportFilenamePrefix = () =>
+    `${(link.link_title || "analytics-report")
+      .replace(/[^a-zA-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")}_analytics_${new Date()
+      .toISOString()
+      .slice(0, 10)}`;
+
+  const handleExportExcel = () => {
+    const canExport =
+      exportRows.length > 0 ||
+      summaryRowsFlat.length > 0 ||
+      weeklyRows.length > 0;
+    if (!canExport) return;
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+
+    // Summary = the same "Clicks by ..." cards shown on the page
+    const summaryWorksheet = XLSX.utils.json_to_sheet(summaryRowsFlat);
+    XLSX.utils.book_append_sheet(workbook, summaryWorksheet, "Summary");
+
+    const weeklyWorksheet = XLSX.utils.json_to_sheet(weeklyRows);
+    XLSX.utils.book_append_sheet(
+      workbook,
+      weeklyWorksheet,
+      "Weekly Analytics"
+    );
+
+    // Click detail = every filtered click row
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Clicks Detail");
+    XLSX.writeFile(workbook, `${getExportFilenamePrefix()}.xlsx`);
+    setIsExportMenuOpen(false);
+  };
+
+  const handleExportPdf = () => {
+    const canExport =
+      exportRows.length > 0 ||
+      summaryRowsFlat.length > 0 ||
+      weeklyRows.length > 0;
+    if (!canExport) return;
+
+    const doc = new jsPDF({ orientation: "landscape" });
+    doc.setFontSize(14);
+    doc.text(`${link.link_title} - Analytics Report`, 14, 14);
+    doc.setFontSize(10);
+    doc.text(`Platform: ${link.platform}`, 14, 20);
+    doc.text(`Date Range: ${startDate} to ${endDate}`, 14, 26);
+    doc.text(`Total Clicks: ${data.totalClicks}`, 14, 32);
+
+    let currentY = 38;
+
+    // Weekly analytics section (same as the weekly chart)
+    doc.setFontSize(12);
+    doc.text("Weekly Analytics", 14, currentY);
+    currentY += 5;
+    autoTable(doc, {
+      startY: currentY,
+      head: [["Week", "Clicks"]],
+      body: weeklyRows.map((r) => [r.Week, r.Clicks]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [37, 99, 235] },
+      margin: { left: 14, right: 14 },
+    });
+    const lastFinalYWeekly = (
+      doc as unknown as { lastAutoTable?: { finalY?: number } }
+    ).lastAutoTable?.finalY;
+    currentY = (lastFinalYWeekly ?? currentY) + 10;
+
+    doc.setFontSize(12);
+    doc.text("Summary (Clicks by Cards)", 14, currentY);
+    currentY += 6;
+
+    // Render one table per card (same order as the UI).
+    for (const section of summarySections) {
+      if (section.entries.length === 0) continue;
+
+      doc.setFontSize(11);
+      doc.text(section.title, 14, currentY);
+      currentY += 4;
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [["#", "Label", "Clicks"]],
+        body: section.entries.map(([label, count], idx) => [
+          idx + 1,
+          label || "Unknown",
+          count,
+        ]),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [37, 99, 235] },
+        margin: { left: 14, right: 14 },
+      });
+
+      const lastFinalY = (
+        doc as unknown as { lastAutoTable?: { finalY?: number } }
+      ).lastAutoTable?.finalY;
+      currentY = (lastFinalY ?? currentY) + 10;
+    }
+
+    // Also include the filtered click rows in the PDF.
+    // (Capped to keep PDF size reasonable.)
+    const PDF_MAX_ROWS = 300;
+    const pdfRows =
+      exportRows.length > PDF_MAX_ROWS
+        ? exportRows.slice(0, PDF_MAX_ROWS)
+        : exportRows;
+
+    currentY += 2;
+    doc.setFontSize(12);
+    doc.text("Detailed Clicks", 14, currentY);
+    currentY += 6;
+
+    if (pdfRows.length === 0) {
+      doc.setFontSize(10);
+      doc.text("No click details for selected filters.", 14, currentY);
+    } else {
+      if (exportRows.length > PDF_MAX_ROWS) {
+        doc.setFontSize(9);
+        doc.text(
+          `Showing first ${PDF_MAX_ROWS} of ${exportRows.length} rows (filtered)`,
+          14,
+          currentY
+        );
+        currentY += 5;
+      }
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [
+          [
+            "S.No",
+            "Clicked At",
+            "Creator",
+            "Submission",
+            "Country",
+            "City",
+            "Device",
+            "Browser",
+          ],
+        ],
+        body: pdfRows.map((row) => [
+          row["S.No"],
+          row["Clicked At"],
+          row.Creator,
+          row.Submission,
+          row.Country,
+          row.City,
+          row.Device,
+          row.Browser,
+        ]),
+        styles: { fontSize: 7 },
+        headStyles: { fillColor: [37, 99, 235] },
+        margin: { left: 14, right: 14 },
+      });
+    }
+
+    doc.save(`${getExportFilenamePrefix()}.pdf`);
+    setIsExportMenuOpen(false);
+  };
 
   const sortedCreatorRows = useMemo(
     () =>
@@ -412,9 +748,26 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
   ) => {
     setClickFilters((prev) => {
       const next = { ...prev, [key]: value };
-      if (key === "country" && prev.city !== FILTER_ALL && value !== FILTER_ALL) {
+      if (key === "country") {
+        if (value !== FILTER_ALL && prev.state !== FILTER_ALL) {
+          const stateStillValid = allClicks.some(
+            (c) => c.country === value && c.state === prev.state
+          );
+          if (!stateStillValid) next.state = FILTER_ALL;
+        }
+        if (prev.city !== FILTER_ALL && value !== FILTER_ALL) {
+          const cityStillValid = allClicks.some(
+            (c) => c.country === value && c.city === prev.city
+          );
+          if (!cityStillValid) next.city = FILTER_ALL;
+        }
+      }
+      if (key === "state" && prev.city !== FILTER_ALL && value !== FILTER_ALL) {
         const cityStillValid = allClicks.some(
-          (c) => c.country === value && c.city === prev.city
+          (c) =>
+            (prev.country === FILTER_ALL || c.country === prev.country) &&
+            c.state === value &&
+            c.city === prev.city
         );
         if (!cityStillValid) next.city = FILTER_ALL;
       }
@@ -429,6 +782,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
       return {
         submissions: [],
         countries: [],
+        states: [],
         cities: [],
         devices: [],
         browsers: [],
@@ -436,9 +790,10 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
     }
     return extractFilterOptions(
       creatorAnalytics.clicks,
-      creatorModalFilters.country
+      creatorModalFilters.country,
+      creatorModalFilters.state
     );
-  }, [creatorAnalytics, creatorModalFilters.country]);
+  }, [creatorAnalytics, creatorModalFilters.country, creatorModalFilters.state]);
 
   const creatorModalFilteredClicks = useMemo(() => {
     if (!creatorAnalytics) return [];
@@ -455,14 +810,31 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
       const next = { ...prev, [key]: value };
       if (
         key === "country" &&
-        prev.city !== FILTER_ALL &&
-        value !== FILTER_ALL &&
         creatorAnalytics
       ) {
-        const cityStillValid = creatorAnalytics.clicks.some(
-          (c) => c.country === value && c.city === prev.city
-        );
-        if (!cityStillValid) next.city = FILTER_ALL;
+        if (value !== FILTER_ALL && prev.state !== FILTER_ALL) {
+          const stateStillValid = creatorAnalytics.clicks.some(
+            (c) => c.country === value && c.state === prev.state
+          );
+          if (!stateStillValid) next.state = FILTER_ALL;
+        }
+        if (prev.city !== FILTER_ALL && value !== FILTER_ALL) {
+          const cityStillValid = creatorAnalytics.clicks.some(
+            (c) => c.country === value && c.city === prev.city
+          );
+          if (!cityStillValid) next.city = FILTER_ALL;
+        }
+      }
+      if (key === "state" && value !== FILTER_ALL && creatorAnalytics) {
+        if (prev.city !== FILTER_ALL) {
+          const cityStillValid = creatorAnalytics.clicks.some(
+            (c) =>
+              (prev.country === FILTER_ALL || c.country === prev.country) &&
+              c.state === value &&
+              c.city === prev.city
+          );
+          if (!cityStillValid) next.city = FILTER_ALL;
+        }
       }
       return next;
     });
@@ -501,6 +873,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
         totalClicks: clicks?.length || 0,
         clicksBySubmission: {} as Record<string, number>,
         clicksByCountry: {} as Record<string, number>,
+        clicksByState: {} as Record<string, number>,
         clicksByCity: {} as Record<string, number>,
         clicksByDevice: {} as Record<string, number>,
         clicksByBrowser: {} as Record<string, number>,
@@ -515,6 +888,10 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
         if (click.country) {
           analytics.clicksByCountry[click.country] =
             (analytics.clicksByCountry[click.country] || 0) + 1;
+        }
+        if (click.state) {
+          analytics.clicksByState[click.state] =
+            (analytics.clicksByState[click.state] || 0) + 1;
         }
         if (click.city) {
           analytics.clicksByCity[click.city] =
@@ -600,6 +977,38 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
                 </a>
               </div>
             </div>
+          </div>
+          <div className="relative ml-auto self-start" ref={exportMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsExportMenuOpen((prev) => !prev)}
+              disabled={!canExport}
+              className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" />
+              Download Report
+              <ChevronDown className="h-4 w-4" />
+            </button>
+            {isExportMenuOpen && (
+              <div className="absolute right-4 mt-2 w-44 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={handleExportPdf}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100"
+                >
+                  <FileText className="h-4 w-4 text-red-600" />
+                  Export PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100"
+                >
+                  <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                  Export Excel
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -742,6 +1151,11 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
             color="cyan"
           />
           <StatsCard
+            title="Clicks by State"
+            data={data.clicksByState}
+            color="amber"
+          />
+          <StatsCard
             title="Clicks by City"
             data={data.clicksByCity}
             color="violet"
@@ -839,7 +1253,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
                                 className={`w-3.5 h-3.5 flex-shrink-0 ${
                                   isActive
                                     ? "text-blue-600"
-                                    : "text-slate-400 opacity-0 group-hover/sort:opacity-100"
+                                    : "text-slate-400"
                                 }`}
                               />
                             </button>
@@ -968,6 +1382,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
                   totalClicks: filteredClicks.length,
                   clicksBySubmission: {} as Record<string, number>,
                   clicksByCountry: {} as Record<string, number>,
+                  clicksByState: {} as Record<string, number>,
                   clicksByCity: {} as Record<string, number>,
                   clicksByDevice: {} as Record<string, number>,
                   clicksByBrowser: {} as Record<string, number>,
@@ -986,6 +1401,10 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
                     filteredAnalytics.clicksByCountry[click.country] =
                       (filteredAnalytics.clicksByCountry[click.country] || 0) +
                       1;
+                  }
+                  if (click.state) {
+                    filteredAnalytics.clicksByState[click.state] =
+                      (filteredAnalytics.clicksByState[click.state] || 0) + 1;
                   }
                   if (click.city) {
                     filteredAnalytics.clicksByCity[click.city] =
@@ -1093,6 +1512,11 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
                         title="Clicks by Country"
                         data={filteredAnalytics.clicksByCountry}
                         color="cyan"
+                      />
+                      <StatsCard
+                        title="Clicks by State"
+                        data={filteredAnalytics.clicksByState}
+                        color="amber"
                       />
                       <StatsCard
                         title="Clicks by City"
@@ -1405,11 +1829,19 @@ function AnalyticsFiltersBar({
     { key: "submission", label: "Submission", values: options.submissions },
     { key: "country", label: "Country", values: options.countries },
     {
+      key: "state",
+      label: "State",
+      values: options.states,
+      disabled:
+        filters.country !== FILTER_ALL && options.states.length === 0,
+    },
+    {
       key: "city",
       label: "City",
       values: options.cities,
       disabled:
-        filters.country !== FILTER_ALL && options.cities.length === 0,
+        (filters.country !== FILTER_ALL || filters.state !== FILTER_ALL) &&
+        options.cities.length === 0,
     },
     { key: "device", label: "Device", values: options.devices },
     { key: "browser", label: "Browser", values: options.browsers },
@@ -1453,7 +1885,7 @@ function AnalyticsFiltersBar({
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
         {filterFields.map(({ key, label, values, disabled }) => (
           <div key={key}>
             <label
@@ -1471,7 +1903,6 @@ function AnalyticsFiltersBar({
             >
               <option value={FILTER_ALL}>
                 All {label}s
-                {values.length > 0 ? ` (${values.length})` : ""}
               </option>
               {values.map((value) => (
                 <option key={value} value={value}>
@@ -1548,6 +1979,7 @@ function StatsCard({
     emerald: "from-emerald-500 to-emerald-600",
     orange: "from-orange-500 to-orange-600",
     cyan: "from-cyan-500 to-cyan-600",
+    amber: "from-amber-500 to-amber-600",
     violet: "from-violet-500 to-violet-600",
     green: "from-green-500 to-green-600",
     slate: "from-slate-500 to-slate-600",
