@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { supabase, Project, Link } from "@/lib/supabase";
 import { LinkList } from "@/components/LinkList";
+import { TitleSearchBar } from "@/components/TitleSearchBar";
+import { matchesTitleQuery } from "@/lib/search";
 import { Analytics } from "@/components/Analytics";
 import { PasswordVerificationModal } from "@/components/PasswordVerificationModal";
+import { Link2, MousePointerClick, TrendingUp } from "lucide-react";
 
 export default function PublicProjectPage() {
   const params = useParams();
@@ -17,8 +20,16 @@ export default function PublicProjectPage() {
   const [requiresPassword, setRequiresPassword] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [totalClicks, setTotalClicks] = useState(0);
+  const [platformCount, setPlatformCount] = useState(0);
+  const [linkSearch, setLinkSearch] = useState("");
 
   const projectSlug = params.projectSlug as string;
+
+  const filteredLinks = useMemo(
+    () => links.filter((l) => matchesTitleQuery(linkSearch, l.link_title)),
+    [links, linkSearch]
+  );
 
   // Load project info and check password requirement on mount
   useEffect(() => {
@@ -139,6 +150,20 @@ export default function PublicProjectPage() {
         }
 
         setLinks(linksData || []);
+
+        if (linksData && linksData.length > 0) {
+          const linkIds = linksData.map((l) => l.id);
+          const { count } = await supabase
+            .from("link_clicks")
+            .select("*", { count: "exact", head: true })
+            .in("link_id", linkIds);
+
+          setTotalClicks(count || 0);
+          setPlatformCount(new Set(linksData.map((l) => l.platform)).size);
+        } else {
+          setTotalClicks(0);
+          setPlatformCount(0);
+        }
 
         // If URL has ?link_id=uuid, preselect that link
         const search = new URLSearchParams(window.location.search);
@@ -282,6 +307,56 @@ export default function PublicProjectPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl border border-slate-200/60 p-4 sm:p-6 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs sm:text-sm text-slate-600 mb-1 font-medium">
+                  Total Links
+                </p>
+                <p className="text-3xl sm:text-4xl font-bold text-slate-900">
+                  {links.length}
+                </p>
+              </div>
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Link2 className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl border border-slate-200/60 p-4 sm:p-6 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs sm:text-sm text-slate-600 mb-1 font-medium">
+                  Total Clicks
+                </p>
+                <p className="text-3xl sm:text-4xl font-bold text-slate-900">
+                  {totalClicks}
+                </p>
+              </div>
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <MousePointerClick className="w-6 h-6 sm:w-7 sm:h-7 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl border border-slate-200/60 p-4 sm:p-6 transition-all duration-300 sm:col-span-2 lg:col-span-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs sm:text-sm text-slate-600 mb-1 font-medium">
+                  Platforms
+                </p>
+                <p className="text-3xl sm:text-4xl font-bold text-slate-900">
+                  {platformCount}
+                </p>
+              </div>
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <TrendingUp className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {links.length === 0 ? (
           <div className="bg-white rounded-xl border-2 border-dashed border-slate-300 p-12 text-center">
             <h3 className="text-xl font-semibold text-slate-900 mb-2">
@@ -290,19 +365,42 @@ export default function PublicProjectPage() {
             <p className="text-slate-600">This project has no public links.</p>
           </div>
         ) : (
-          <LinkList
-            links={links}
-            onSelectLink={(link) => {
-              setSelectedLinkId(link.id);
-              const url = new URL(window.location.href);
-              url.searchParams.set("link_id", link.id);
-              window.history.replaceState({}, "", url.toString());
-            }}
-            onDeleteLink={() => {}}
-            projectSlug={project.slug}
-            readOnly
-            enableSelectInReadOnly
-          />
+          <>
+            <TitleSearchBar
+              value={linkSearch}
+              onChange={setLinkSearch}
+              placeholder="Search links by title..."
+              className="mb-6 max-w-md"
+            />
+            {filteredLinks.length === 0 ? (
+              <div className="bg-white rounded-xl border border-slate-200 p-8 text-center shadow-sm">
+                <p className="text-slate-600">
+                  No links match &quot;{linkSearch.trim()}&quot;.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setLinkSearch("")}
+                  className="mt-3 text-sm font-semibold text-blue-600 hover:text-blue-700"
+                >
+                  Clear search
+                </button>
+              </div>
+            ) : (
+              <LinkList
+                links={filteredLinks}
+                onSelectLink={(link) => {
+                  setSelectedLinkId(link.id);
+                  const url = new URL(window.location.href);
+                  url.searchParams.set("link_id", link.id);
+                  window.history.replaceState({}, "", url.toString());
+                }}
+                onDeleteLink={() => {}}
+                projectSlug={project.slug}
+                readOnly
+                enableSelectInReadOnly
+              />
+            )}
+          </>
         )}
       </div>
     </div>

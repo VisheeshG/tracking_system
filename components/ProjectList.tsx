@@ -7,7 +7,7 @@ import { FolderOpen, Trash2, AlertTriangle } from "lucide-react";
 interface ProjectListProps {
   projects: Project[];
   onSelectProject: (project: Project) => void;
-  onDeleteProject: (projectId: string) => void;
+  onDeleteProject: (projectId: string) => void | Promise<void>;
 }
 
 export function ProjectList({
@@ -30,10 +30,11 @@ export function ProjectList({
     setDeleteConfirm({ show: true, projectId, projectName });
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deleteConfirm.projectId) {
-      onDeleteProject(deleteConfirm.projectId);
+      const projectId = deleteConfirm.projectId;
       setDeleteConfirm({ show: false, projectId: null, projectName: null });
+      await onDeleteProject(projectId);
     }
   };
 

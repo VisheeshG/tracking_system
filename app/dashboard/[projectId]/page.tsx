@@ -39,12 +39,20 @@ export default function ProjectPage() {
     }
   }, [loading, user, router, projectId]);
 
+  // Reset when navigating to a different project
   useEffect(() => {
-    const loadProject = async () => {
-      if (!user || !projectId) return;
+    setProject(null);
+    setProjectLoading(true);
+    setError(null);
+  }, [projectId]);
 
+  useEffect(() => {
+    if (!user?.id || !projectId) return;
+
+    let cancelled = false;
+
+    const loadProject = async () => {
       try {
-        setProjectLoading(true);
         setError(null);
 
         const { data, error } = await supabase
@@ -53,6 +61,8 @@ export default function ProjectPage() {
           .eq("id", projectId)
           .eq("user_id", user.id)
           .single();
+
+        if (cancelled) return;
 
         if (error) {
           console.error("Error loading project:", error);
@@ -67,19 +77,23 @@ export default function ProjectPage() {
 
         setProject(data);
       } catch (err) {
+        if (cancelled) return;
         console.error("Error loading project:", err);
         setError("Failed to load project");
       } finally {
-        setProjectLoading(false);
+        if (!cancelled) setProjectLoading(false);
       }
     };
 
-    if (user && projectId) {
-      loadProject();
-    }
-  }, [user, projectId]);
+    loadProject();
 
-  if (loading || projectLoading) {
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, projectId]);
+
+  // Full-page loader only on initial load (keeps modals open on tab switch / token refresh)
+  if (loading || (projectLoading && !project)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 flex items-center justify-center">
         <div className="text-center">

@@ -40,27 +40,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      (async () => {
-        setUser(session?.user ?? null);
-      })();
+      const nextUser = session?.user ?? null;
+      setUser((prev) => (prev?.id === nextUser?.id ? prev : nextUser));
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          full_name: fullName,
+        },
+      },
     });
-
-    if (!error && data.user) {
-      await supabase.from("profiles").insert({
-        id: data.user.id,
-        email,
-        full_name: fullName,
-      });
-    }
 
     return { error };
   };

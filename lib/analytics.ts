@@ -1,5 +1,34 @@
 // Analytics utility functions for device and browser detection
 
+const LOOPBACK_IPS = new Set(["::1", "127.0.0.1", "localhost"]);
+
+export function isLoopbackIp(ip: string | null | undefined): boolean {
+  if (!ip) return false;
+  const normalized = ip.trim().toLowerCase();
+  return (
+    LOOPBACK_IPS.has(normalized) ||
+    normalized.startsWith("::ffff:127.") ||
+    normalized.startsWith("127.")
+  );
+}
+
+export function getClientIpFromRequest(request: Request): string | null {
+  const headerCandidates = [
+    request.headers.get("x-forwarded-for")?.split(",")[0],
+    request.headers.get("x-real-ip"),
+    request.headers.get("cf-connecting-ip"),
+    request.headers.get("x-vercel-forwarded-for")?.split(",")[0],
+    request.headers.get("true-client-ip"),
+  ];
+
+  for (const value of headerCandidates) {
+    const ip = value?.trim();
+    if (ip) return ip;
+  }
+
+  return null;
+}
+
 export function getDeviceType(userAgent: string): string {
   const ua = userAgent.toLowerCase();
 
@@ -55,6 +84,7 @@ export function getOS(userAgent: string): string {
 
 export async function getLocationData(): Promise<{
   country: string | null;
+  state: string | null;
   city: string | null;
 }> {
   try {
@@ -64,6 +94,7 @@ export async function getLocationData(): Promise<{
       const data = await response.json();
       return {
         country: data.country_name || null,
+        state: data.region || null,
         city: data.city || null,
       };
     }
@@ -78,6 +109,7 @@ export async function getLocationData(): Promise<{
       const data = await response.json();
       return {
         country: data.country || null,
+        state: data.regionName || null,
         city: data.city || null,
       };
     }
@@ -87,6 +119,7 @@ export async function getLocationData(): Promise<{
 
   return {
     country: null,
+    state: null,
     city: null,
   };
 }

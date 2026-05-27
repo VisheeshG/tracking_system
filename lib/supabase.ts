@@ -36,6 +36,7 @@ export type Link = {
   link_title: string;
   platform: string;
   submission_number: string | null;
+  open_app_on_mobile?: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -49,6 +50,7 @@ export type LinkClick = {
   ip_address: string | null;
   user_agent: string | null;
   country: string | null;
+  state: string | null;
   city: string | null;
   device_type: string | null;
   browser: string | null;

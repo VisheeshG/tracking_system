@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  getClientIpFromRequest,
+  isLoopbackIp,
+} from "@/lib/analytics";
+import {
+  buildMobileAppRedirectHtml,
+  resolveMobileAppRedirect,
+} from "@/lib/mobile-app-redirect";
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -81,7 +89,9 @@ export async function GET(
     // Get link
     const { data: linkData } = await supabase
       .from("links")
-      .select("id, destination_url, platform, submission_number")
+      .select(
+        "id, destination_url, platform, submission_number, open_app_on_mobile"
+      )
       .eq("short_code", shortCode)
       .eq("project_id", projectData.id)
       .single();
@@ -93,11 +103,8 @@ export async function GET(
     // Get server-side tracking info
     const userAgent = request.headers.get("user-agent") || "";
 
-    // Get client IP address
-    const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0] ||
-      request.headers.get("x-real-ip") ||
-      null;
+    // Get client IP address (headers + geo API fallback below)
+    let ip = getClientIpFromRequest(request);
 
     // Parse user agent for device info
     const deviceType = getDeviceType(userAgent);
@@ -106,6 +113,7 @@ export async function GET(
 
     // Get location data from IP (server-side)
     let country = null;
+    let state = null;
     let city = null;
 
     console.log("=== LOCATION LOOKUP START ===");
@@ -119,7 +127,7 @@ export async function GET(
     try {
       // Use ip-api.com which has better free tier (45 requests/minute)
       const locationUrl =
-        ip && ip !== "::1" && ip !== "127.0.0.1" && ip !== "localhost"
+        ip && !isLoopbackIp(ip)
           ? `http://ip-api.com/json/${ip}`
           : `http://ip-api.com/json`; // Auto-detect from request
 
@@ -141,8 +149,20 @@ export async function GET(
         // ip-api.com returns 'country' and 'city' directly
         if (locationData.status === "success") {
           country = locationData.country || null;
+          state = locationData.regionName || null;
           city = locationData.city || null;
-          console.log("✅ Location extracted successfully:", { country, city });
+          if (
+            locationData.query &&
+            (!ip || isLoopbackIp(ip))
+          ) {
+            ip = locationData.query;
+          }
+          console.log("✅ Location extracted successfully:", {
+            country,
+            state,
+            city,
+            ip,
+          });
         } else {
           console.error("❌ ip-api.com returned error:", locationData.message);
 
@@ -150,7 +170,7 @@ export async function GET(
           console.log("Trying fallback API: ipapi.co");
           try {
             const fallbackUrl =
-              ip && ip !== "::1" && ip !== "127.0.0.1" && ip !== "localhost"
+              ip && !isLoopbackIp(ip)
                 ? `https://ipapi.co/${ip}/json/`
                 : `https://ipapi.co/json/`;
 
@@ -165,8 +185,20 @@ export async function GET(
                 JSON.stringify(fallbackData, null, 2)
               );
               country = fallbackData.country_name || null;
+              state = fallbackData.region || null;
               city = fallbackData.city || null;
-              console.log("✅ Fallback location extracted:", { country, city });
+              if (
+                fallbackData.ip &&
+                (!ip || isLoopbackIp(ip))
+              ) {
+                ip = fallbackData.ip;
+              }
+              console.log("✅ Fallback location extracted:", {
+                country,
+                state,
+                city,
+                ip,
+              });
             }
           } catch (fallbackError) {
             console.error("Fallback API also failed:", fallbackError);
@@ -180,7 +212,7 @@ export async function GET(
       console.error("Location lookup error:", error);
     }
 
-    console.log("Final location values:", { country, city });
+    console.log("Final location values:", { country, state, city, ip });
 
     // Use submission number from URL if provided, otherwise use from database
     const submissionNumber =
@@ -189,7 +221,9 @@ export async function GET(
     // Record click with all tracking data including location
     console.log("Recording click with data:", {
       link_id: linkData.id,
+      ip_address: ip,
       country,
+      state,
       city,
       device_type: deviceType,
       submission_number: submissionNumber,
@@ -201,7 +235,9 @@ export async function GET(
       creator_username: creatorUsername,
       submission_number: submissionNumber,
       user_agent: userAgent,
+      ip_address: ip,
       country: country,
+      state: state,
       city: city,
       device_type: deviceType,
       browser: browser,
@@ -213,12 +249,35 @@ export async function GET(
       console.error("Tracking error:", trackError);
     } else {
       console.log("Click tracked successfully with location:", {
+        ip_address: ip,
         country,
+        state,
         city,
       });
     }
 
-    // Now redirect after tracking is complete
+    const isMobileDevice =
+      deviceType === "mobile" || deviceType === "tablet";
+
+    if (linkData.open_app_on_mobile && isMobileDevice) {
+      const appTargets = resolveMobileAppRedirect(
+        linkData.destination_url,
+        os
+      );
+      if (
+        appTargets &&
+        (appTargets.appUrl || appTargets.androidIntent)
+      ) {
+        return new NextResponse(buildMobileAppRedirectHtml(appTargets), {
+          status: 200,
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+          },
+        });
+      }
+    }
+
     return NextResponse.redirect(linkData.destination_url, 307);
   } catch (error) {
     console.error("Redirect error:", error);

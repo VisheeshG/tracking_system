@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase, Project } from "@/lib/supabase";
 import { ProjectList } from "./ProjectList";
+import { DashboardStatsCards } from "./DashboardStatsCards";
+import { TitleSearchBar } from "./TitleSearchBar";
+import { matchesTitleQuery } from "@/lib/search";
 import { generateUniqueProjectSlug } from "@/lib/generators";
 import { LogOut, Plus, FolderOpen } from "lucide-react";
 import toast from "react-hot-toast";
@@ -14,11 +17,61 @@ export function Dashboard() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [totalLinks, setTotalLinks] = useState(0);
+  const [totalClicks, setTotalClicks] = useState(0);
   const [showNewProject, setShowNewProject] = useState(false);
+  const [projectSearch, setProjectSearch] = useState("");
+
+  const filteredProjects = useMemo(
+    () =>
+      projects.filter((p) => matchesTitleQuery(projectSearch, p.name)),
+    [projects, projectSearch]
+  );
+
+  const loadDashboardStats = useCallback(async (projectIds: string[]) => {
+    if (projectIds.length === 0) {
+      setTotalLinks(0);
+      setTotalClicks(0);
+      setStatsLoading(false);
+      return;
+    }
+
+    try {
+      const { data: links, error: linksError } = await supabase
+        .from("links")
+        .select("id")
+        .in("project_id", projectIds);
+
+      if (linksError) throw linksError;
+
+      const linkCount = links?.length ?? 0;
+      setTotalLinks(linkCount);
+
+      if (!links || links.length === 0) {
+        setTotalClicks(0);
+        return;
+      }
+
+      const linkIds = links.map((l) => l.id);
+      const { count, error: clicksError } = await supabase
+        .from("link_clicks")
+        .select("*", { count: "exact", head: true })
+        .in("link_id", linkIds);
+
+      if (clicksError) throw clicksError;
+      setTotalClicks(count ?? 0);
+    } catch (error) {
+      console.error("Error loading dashboard stats:", error);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
 
   const loadProjects = useCallback(async () => {
     if (!user) return;
 
+    setStatsLoading(true);
     try {
       const { data, error } = await supabase
         .from("projects")
@@ -27,13 +80,16 @@ export function Dashboard() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setProjects(data || []);
+      const projectList = data || [];
+      setProjects(projectList);
+      await loadDashboardStats(projectList.map((p) => p.id));
     } catch (error) {
       console.error("Error loading projects:", error);
+      setStatsLoading(false);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, loadDashboardStats]);
 
   useEffect(() => {
     loadProjects();
@@ -78,16 +134,22 @@ export function Dashboard() {
         return false;
       }
 
+      const trimmedSlug = slug.trim();
+      if (!trimmedSlug) {
+        toast.error("Project slug is required");
+        return false;
+      }
+
       // Check if slug already exists (across all users)
       const { data: existingSlug, error: slugError } = await supabase
         .from("projects")
         .select("id")
-        .eq("slug", slug)
+        .eq("slug", trimmedSlug)
         .single();
 
       if (!slugError && existingSlug) {
         toast.error(
-          `Project slug "${slug}" is already taken. Click "New" to generate a different one.`,
+          `Project slug "${trimmedSlug}" is already taken. Choose a different slug.`,
           { duration: 5000 }
         );
         return false;
@@ -99,7 +161,7 @@ export function Dashboard() {
           user_id: user.id,
           name: trimmedName,
           description,
-          slug,
+          slug: trimmedSlug,
         })
         .select()
         .single();
@@ -108,7 +170,7 @@ export function Dashboard() {
         // Check if error is due to duplicate slug constraint
         if (error.code === "23505" && error.message.includes("slug")) {
           toast.error(
-            `Project slug "${slug}" is already taken. Click "New" to generate a different one.`,
+            `Project slug "${trimmedSlug}" is already taken. Choose a different slug.`,
             { duration: 5000 }
           );
           return false;
@@ -131,78 +193,35 @@ export function Dashboard() {
 
   const handleDeleteProject = async (projectId: string) => {
     try {
-      console.log("Starting deletion for project:", projectId);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      // First, get all links for this project
-      const { data: links, error: linksError } = await supabase
-        .from("links")
-        .select("id")
-        .eq("project_id", projectId);
-
-      if (linksError) {
-        console.error("Error fetching links:", linksError);
-        throw linksError;
+      if (!session?.access_token) {
+        toast.error("You must be signed in to delete a project");
+        return;
       }
 
-      console.log(`Found ${links?.length || 0} links for project`);
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
-      // Delete all link_clicks for each link
-      if (links && links.length > 0) {
-        const linkIds = links.map((link) => link.id);
-        console.log("Deleting link_clicks for link IDs:", linkIds);
+      const result = await response.json().catch(() => ({}));
 
-        const { error: clicksError, count: clicksCount } = await supabase
-          .from("link_clicks")
-          .delete({ count: "exact" })
-          .in("link_id", linkIds);
-
-        if (clicksError) {
-          console.error("Error deleting link_clicks:", clicksError);
-          throw clicksError;
-        }
-        console.log(`Deleted ${clicksCount} link_clicks`);
-
-        // Delete all links for this project
-        console.log("Deleting links for project:", projectId);
-        const { error: deleteLinksError, count: linksCount } = await supabase
-          .from("links")
-          .delete({ count: "exact" })
-          .eq("project_id", projectId);
-
-        if (deleteLinksError) {
-          console.error("Error deleting links:", deleteLinksError);
-          throw deleteLinksError;
-        }
-        console.log(`Deleted ${linksCount} links`);
+      if (!response.ok) {
+        throw new Error(
+          typeof result.error === "string"
+            ? result.error
+            : "Error deleting project"
+        );
       }
 
-      // Delete all project passwords
-      console.log("Deleting project passwords for project:", projectId);
-      const { error: passwordsError, count: passwordsCount } = await supabase
-        .from("project_passwords")
-        .delete({ count: "exact" })
-        .eq("project_id", projectId);
-
-      if (passwordsError) {
-        console.error("Error deleting passwords:", passwordsError);
-        throw passwordsError;
-      }
-      console.log(`Deleted ${passwordsCount} project_passwords`);
-
-      // Finally, delete the project itself
-      console.log("Deleting project:", projectId);
-      const { error, count: projectCount } = await supabase
-        .from("projects")
-        .delete({ count: "exact" })
-        .eq("id", projectId);
-
-      if (error) {
-        console.error("Error deleting project:", error);
-        throw error;
-      }
-      console.log(`Deleted ${projectCount} project(s)`);
-
-      setProjects(projects.filter((p) => p.id !== projectId));
+      const remaining = projects.filter((p) => p.id !== projectId);
+      setProjects(remaining);
+      await loadDashboardStats(remaining.map((p) => p.id));
       toast.success("Project and all associated data deleted successfully");
     } catch (error: unknown) {
       console.error("Error deleting project:", error);
@@ -264,6 +283,12 @@ export function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-6 sm:py-8 lg:py-10">
+      <DashboardStatsCards
+              totalProjects={projects.length}
+              totalLinks={totalLinks}
+              totalClicks={totalClicks}
+              loading={statsLoading}
+            />
         <div className="mb-8 sm:mb-10">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0 mb-6 sm:mb-8">
             <div>
@@ -305,11 +330,35 @@ export function Dashboard() {
             </button>
           </div>
         ) : (
-          <ProjectList
-            projects={projects}
-            onSelectProject={handleSelectProject}
-            onDeleteProject={handleDeleteProject}
-          />
+          <>
+            <TitleSearchBar
+              value={projectSearch}
+              onChange={setProjectSearch}
+              placeholder="Search projects by title..."
+              className="mb-6 max-w-md"
+            />
+        
+            {filteredProjects.length === 0 ? (
+              <div className="bg-white rounded-xl border border-slate-200 p-8 text-center shadow-sm">
+                <p className="text-slate-600">
+                  No projects match &quot;{projectSearch.trim()}&quot;.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setProjectSearch("")}
+                  className="mt-3 text-sm font-semibold text-blue-600 hover:text-blue-700"
+                >
+                  Clear search
+                </button>
+              </div>
+            ) : (
+              <ProjectList
+                projects={filteredProjects}
+                onSelectProject={handleSelectProject}
+                onDeleteProject={handleDeleteProject}
+              />
+            )}
+          </>
         )}
       </main>
 
@@ -319,7 +368,7 @@ export function Dashboard() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setShowNewProject(false)}
           />
-          <div className="relative z-10 w-full max-w-lg animate-in slide-in-from-bottom-4 duration-300">
+          <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-4 duration-300">
             <NewProjectForm
               onSubmit={handleCreateProject}
               onCancel={() => setShowNewProject(false)}
@@ -345,6 +394,7 @@ function NewProjectForm({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [slug, setSlug] = useState("");
+  const [slugMode, setSlugMode] = useState<"auto" | "custom">("auto");
   const [isGeneratingSlug, setIsGeneratingSlug] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -364,6 +414,8 @@ function NewProjectForm({
   const handleNameChange = (value: string) => {
     setName(value);
 
+    if (slugMode !== "auto") return;
+
     // Clear existing timeout
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -382,6 +434,18 @@ function NewProjectForm({
     }
   };
 
+  const handleSlugModeChange = (mode: "auto" | "custom") => {
+    setSlugMode(mode);
+    if (mode === "custom") {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      setSlug("");
+    } else {
+      handleGenerateSlug();
+    }
+  };
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -395,10 +459,11 @@ function NewProjectForm({
     e.preventDefault();
     if (isSubmitting) return; // Prevent duplicate submissions
 
-    // Validate that slug is not empty
     if (!slug.trim()) {
       toast.error(
-        "Please wait for the project slug to be generated before submitting."
+        slugMode === "auto"
+          ? "Please wait for the project slug to be generated before submitting."
+          : "Please enter a custom project slug."
       );
       return;
     }
@@ -450,35 +515,80 @@ function NewProjectForm({
         </div>
 
         <div>
-          <label
-            htmlFor="slug"
-            className="block text-sm font-bold text-slate-700 mb-1.5"
-          >
+          <span className="block text-sm font-bold text-slate-700 mb-1.5">
             Project Slug
-          </label>
+          </span>
+          <div className="flex rounded-xl border-2 border-slate-300 p-0.5 mb-2">
+            <button
+              type="button"
+              onClick={() => handleSlugModeChange("auto")}
+              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                slugMode === "auto"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              Auto-generate
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSlugModeChange("custom")}
+              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                slugMode === "custom"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              Custom
+            </button>
+          </div>
           <div className="flex space-x-2">
             <input
               id="slug"
               type="text"
               value={slug}
-              readOnly
-              className="flex-1 px-3 py-3 text-base border-2 border-slate-300 rounded-xl bg-slate-50 text-slate-600 cursor-not-allowed font-mono"
-              placeholder="Auto-generated letter"
+              onChange={
+                slugMode === "custom"
+                  ? (e) => setSlug(e.target.value)
+                  : undefined
+              }
+              readOnly={slugMode === "auto"}
+              className={`flex-1 px-3 py-3 text-base border-2 border-slate-300 rounded-xl font-mono outline-none transition-all ${
+                slugMode === "auto"
+                  ? "bg-slate-50 text-slate-600 cursor-not-allowed"
+                  : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              }`}
+              placeholder={
+                slugMode === "auto"
+                  ? "Auto-generated letter"
+                  : "e.g., my-campaign, launch2026"
+              }
               required
             />
-            <button
-              type="button"
-              onClick={handleGenerateSlug}
-              disabled={isGeneratingSlug}
-              className="px-4 py-2 text-sm bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap"
-            >
-              {isGeneratingSlug ? "..." : "New"}
-            </button>
+            {slugMode === "auto" && (
+              <button
+                type="button"
+                onClick={handleGenerateSlug}
+                disabled={isGeneratingSlug}
+                className="px-4 py-2 text-sm bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap"
+              >
+                {isGeneratingSlug ? "..." : "New"}
+              </button>
+            )}
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Auto-generated when you type a project name (starts with single
-            letters like &quot;a&quot;, then &quot;a12&quot;, then
-            &quot;ab1&quot;, etc.). Click &quot;New&quot; if already taken.
+            {slugMode === "auto" ? (
+              <>
+                Auto-generated when you type a project name (starts with single
+                letters like &quot;a&quot;, then &quot;a12&quot;, then
+                &quot;ab1&quot;, etc.). Click &quot;New&quot; if already taken.
+              </>
+            ) : (
+              <>
+                Enter any slug you want. It must be unique and is used in your
+                tracking URLs (e.g. /your-slug/...).
+              </>
+            )}
           </p>
         </div>
 
