@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { LogIn, UserPlus, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
   const [isSignUp, setIsSignUp] = useState(mode === "signup");
@@ -42,7 +43,7 @@ export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
         await signOut();
         // Wait a bit for auth state to clear before redirecting
         await new Promise((resolve) => setTimeout(resolve, 100));
-        router.push("/");
+        router.push("/login");
         return;
       }
 
@@ -68,13 +69,12 @@ export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-xl mb-4">
-              {isSignUp ? (
-                <UserPlus className="w-8 h-8 text-white" />
-              ) : (
-                <LogIn className="w-8 h-8 text-white" />
-              )}
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl mb-4 bg-slate-900 shadow-lg">
+              <BrandLogo size={48} priority />
             </div>
+            <p className="text-sm font-semibold text-slate-500 tracking-wide uppercase mb-1">
+              Linkto
+            </p>
             <h1 className="text-3xl font-bold text-slate-900">
               {isSignUp ? "Create Account" : "Welcome Back"}
             </h1>
@@ -182,7 +182,7 @@ export function Auth({ mode = "signin" }: { mode?: "signin" | "signup" }) {
                   setIsSignUp(false);
                   setError("");
                   // Navigate to login route for clarity
-                  router.push("/");
+                  router.push("/login");
                 }}
                 className="text-blue-600 hover:text-blue-700 font-medium cursor-pointer text-sm"
               >

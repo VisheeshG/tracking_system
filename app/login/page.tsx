@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Auth } from "@/components/Auth";
 
-function SignupPageContent() {
+function LoginPageContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && user) {
+    if (loading) return;
+    if (user) {
       router.replace("/dashboard");
     }
   }, [loading, user, router]);
@@ -23,12 +24,10 @@ function SignupPageContent() {
     );
   }
 
-  if (user) return null;
-
-  return <Auth mode="signup" />;
+  return <Auth mode="signin" />;
 }
 
-export default function SignupPage() {
+export default function LoginPage() {
   return (
     <Suspense
       fallback={
@@ -37,7 +36,7 @@ export default function SignupPage() {
         </div>
       }
     >
-      <SignupPageContent />
+      <LoginPageContent />
     </Suspense>
   );
 }

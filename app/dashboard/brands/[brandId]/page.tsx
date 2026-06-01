@@ -13,7 +13,7 @@ export default function BrandPage() {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.replace("/");
+      router.replace("/login");
     }
   }, [loading, user, router]);
 
