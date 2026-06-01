@@ -182,7 +182,7 @@ export function SocialShare({
       {/* Backdrop for mobile */}
       {showShareMenu && (
         <div
-          className="fixed inset-0 z-40"
+          className="clickable-backdrop fixed inset-0 z-40"
           onClick={() => setShowShareMenu(false)}
         />
       )}

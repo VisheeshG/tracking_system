@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef, Suspense, useMemo } from "rea
 import { useRouter, useSearchParams } from "next/navigation";
 import { Project, Link, supabase } from "@/lib/supabase";
 import {
-  ArrowLeft,
   Plus,
   Link2,
   TrendingUp,
@@ -18,6 +17,11 @@ import { Analytics } from "./Analytics";
 import { SocialShare } from "./SocialShare";
 import { ProjectPasswordManager } from "./ProjectPasswordManager";
 import { generateUniqueShortCode } from "@/lib/generators";
+import {
+  countClicksForLinkIds,
+  deleteAllClicksForLinkId,
+  fetchAllLinksForProjectId,
+} from "@/lib/supabase-pagination";
 import { canOpenInNativeApp } from "@/lib/mobile-app-redirect";
 import toast from "react-hot-toast";
 
@@ -37,6 +41,33 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
   const [accessToken, setAccessToken] = useState<string>("");
   const [formResetKey, setFormResetKey] = useState(0);
   const [linkSearch, setLinkSearch] = useState("");
+  const [brandName, setBrandName] = useState<string | null>(null);
+  const [brandSlug, setBrandSlug] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!project.brand_id) {
+      setBrandName(null);
+      setBrandSlug(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("brands")
+        .select("name, slug")
+        .eq("id", project.brand_id)
+        .single();
+      if (!cancelled) {
+        setBrandName(data?.name ?? null);
+        setBrandSlug(data?.slug ?? null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [project.brand_id]);
 
   const filteredLinks = useMemo(
     () =>
@@ -50,28 +81,18 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
 
   const loadLinks = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("links")
-        .select("*")
-        .eq("project_id", project.id)
-        .order("created_at", { ascending: false });
+      const data = await fetchAllLinksForProjectId(supabase, project.id);
+      setLinks(data);
 
-      if (error) throw error;
-      setLinks(data || []);
-
-      if (data && data.length > 0) {
+      if (data.length > 0) {
         const linkIds = data.map((l) => l.id);
-        const { count } = await supabase
-          .from("link_clicks")
-          .select("*", { count: "exact", head: true })
-          .in("link_id", linkIds);
+        const clickCount = await countClicksForLinkIds(supabase, linkIds);
+        setTotalClicks(clickCount);
 
-        setTotalClicks(count || 0);
-
-        // Calculate unique platforms
         const uniquePlatforms = new Set(data.map((l) => l.platform));
         setPlatformCount(uniquePlatforms.size);
       } else {
+        setTotalClicks(0);
         setPlatformCount(0);
       }
     } catch (error) {
@@ -144,7 +165,8 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
     platform: string,
     destinationUrl: string,
     shortCode: string,
-    openAppOnMobile: boolean
+    openAppOnMobile: boolean,
+    includeSubmissionInUrl: boolean
   ) => {
     try {
       // Check if destination URL already exists in this project
@@ -196,6 +218,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
           short_code: finalShortCode,
           submission_number: submissionNumber,
           open_app_on_mobile: openAppOnMobile,
+          include_submission_in_url: includeSubmissionInUrl,
         })
         .select()
         .single();
@@ -224,16 +247,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
     try {
       console.log("Starting deletion for link:", linkId);
 
-      // First, delete all link_clicks for this link
-      const { error: clicksError, count: clicksCount } = await supabase
-        .from("link_clicks")
-        .delete({ count: "exact" })
-        .eq("link_id", linkId);
-
-      if (clicksError) {
-        console.error("Error deleting link_clicks:", clicksError);
-        throw clicksError;
-      }
+      const clicksCount = await deleteAllClicksForLinkId(supabase, linkId);
       console.log(`Deleted ${clicksCount} link_clicks`);
 
       // Then delete the link itself
@@ -280,6 +294,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
           router.replace(qs ? `?${qs}` : `/dashboard/${project.id}`);
         }}
         projectSlug={project.slug}
+        brandSlug={brandSlug}
       />
     );
   }
@@ -288,15 +303,31 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50">
       <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200/60 top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-3 sm:py-4">
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="group flex items-center space-x-2 text-sm sm:text-base text-slate-600 hover:text-blue-600 mb-3 sm:mb-4 transition-all duration-200 hover:translate-x-[-4px]"
-          >
-            <div className="p-1 rounded-lg group-hover:bg-blue-50 transition-colors">
-              <ArrowLeft className="w-4 h-4" />
-            </div>
-            <span className="font-medium">Back to Projects</span>
-          </button>
+          <nav className="flex flex-wrap items-center gap-2 text-sm text-slate-600 mb-3 sm:mb-4">
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="hover:text-blue-600 font-medium"
+            >
+              Dashboard
+            </button>
+            {project.brand_id && brandName && (
+              <>
+                <span className="text-slate-400">/</span>
+                <button
+                  onClick={() =>
+                    router.push(`/dashboard/brands/${project.brand_id}`)
+                  }
+                  className="hover:text-violet-600 font-medium"
+                >
+                  {brandName}
+                </button>
+              </>
+            )}
+            <span className="text-slate-400">/</span>
+            <span className="text-slate-900 font-medium truncate max-w-[200px] sm:max-w-none">
+              {project.name}
+            </span>
+          </nav>
 
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-0">
             <div className="flex-1 min-w-0">
@@ -452,6 +483,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
                 onSelectLink={handleSelectLink}
                 onDeleteLink={handleDeleteLink}
                 projectSlug={project.slug}
+                brandSlug={brandSlug}
               />
             )}
           </>
@@ -462,7 +494,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
       {showNewLink && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="clickable-backdrop absolute inset-0 bg-black/60 backdrop-blur-sm"
             onMouseDown={(e) => {
               newLinkBackdropPointerDown.current = e.target === e.currentTarget;
             }}
@@ -490,7 +522,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
       {showPasswordManager && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="clickable-backdrop absolute inset-0 bg-black/60 backdrop-blur-sm"
             onMouseDown={(e) => {
               passwordBackdropPointerDown.current =
                 e.target === e.currentTarget;
@@ -544,7 +576,8 @@ function NewLinkForm({
     platform: string,
     destinationUrl: string,
     shortCode: string,
-    openAppOnMobile: boolean
+    openAppOnMobile: boolean,
+    includeSubmissionInUrl: boolean
   ) => Promise<boolean>;
   onCancel: () => void;
 }) {
@@ -553,6 +586,7 @@ function NewLinkForm({
   const [destinationUrl, setDestinationUrl] = useState("");
   const [shortCode, setShortCode] = useState("");
   const [openAppOnMobile, setOpenAppOnMobile] = useState(false);
+  const [includeSubmissionInUrl, setIncludeSubmissionInUrl] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -613,7 +647,8 @@ function NewLinkForm({
         platform,
         destinationUrl,
         shortCode,
-        openAppOnMobile
+        openAppOnMobile,
+        includeSubmissionInUrl
       );
     } finally {
       setIsSubmitting(false);
@@ -698,7 +733,27 @@ function NewLinkForm({
           />
         </div>
 
-        <div className="rounded-xl border-2 border-slate-200 p-3">
+        <div className="rounded-xl border-2 border-slate-200 p-3 space-y-3">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={includeSubmissionInUrl}
+              onChange={(e) => setIncludeSubmissionInUrl(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>
+              <span className="block text-sm font-bold text-slate-700">
+                Include submission in tracking URL
+              </span>
+              <span className="block text-xs text-slate-500 mt-0.5">
+                When enabled, links end with{" "}
+                <span className="font-mono">/sub1</span> (e.g. for multiple
+                posts). When off, URLs end with the creator name only — cleaner
+                for bios.
+              </span>
+            </span>
+          </label>
+
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"

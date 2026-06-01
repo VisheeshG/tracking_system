@@ -18,9 +18,20 @@ export type Profile = {
   updated_at: string;
 };
 
+export type Brand = {
+  id: string;
+  user_id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Project = {
   id: string;
   user_id: string;
+  brand_id: string | null;
   name: string;
   description: string | null;
   slug: string;
@@ -37,6 +48,7 @@ export type Link = {
   platform: string;
   submission_number: string | null;
   open_app_on_mobile?: boolean;
+  include_submission_in_url?: boolean;
   created_at: string;
   updated_at: string;
 };

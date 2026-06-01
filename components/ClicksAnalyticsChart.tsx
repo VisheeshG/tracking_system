@@ -18,9 +18,7 @@ interface ClicksAnalyticsChartProps {
   weeklyData: { week: string; clicks: number }[];
   startDate: string;
   endDate: string;
-  onStartDateChange: (date: string) => void;
-  onEndDateChange: (date: string) => void;
-  onCurrentWeekClick: () => void;
+  totalClicksInRange?: number;
 }
 
 // Format large numbers with Indian numbering system
@@ -47,9 +45,7 @@ export function ClicksAnalyticsChart({
   weeklyData,
   startDate,
   endDate,
-  onStartDateChange,
-  onEndDateChange,
-  onCurrentWeekClick,
+  totalClicksInRange,
 }: ClicksAnalyticsChartProps) {
   const [windowWidth, setWindowWidth] = useState<number>(
     typeof window !== "undefined" ? window.innerWidth : 1024
@@ -66,8 +62,9 @@ export function ClicksAnalyticsChart({
     return null;
   }
 
-  // Calculate total clicks for selected date range
-  const totalClicks = weeklyData.reduce((sum, day) => sum + day.clicks, 0);
+  const totalClicks =
+    totalClicksInRange ??
+    weeklyData.reduce((sum, day) => sum + day.clicks, 0);
 
   // Responsive chart configuration based on window width
   const getChartConfig = () => {
@@ -104,7 +101,7 @@ export function ClicksAnalyticsChart({
           </div>
           <div>
             <h3 className="text-base sm:text-lg font-bold text-slate-900">
-              Weekly Analytics
+              Clicks over time
             </h3>
             <p className="text-xs text-slate-600">
               {`${dayjs(startDate).format("MMM D, YYYY")} - ${dayjs(
@@ -132,38 +129,6 @@ export function ClicksAnalyticsChart({
             </div>
           </div>
 
-          {/* Date Range Picker */}
-          <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-end">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Start Date
-              </label>
-              <input
-                type="date"
-                value={startDate}
-                max={new Date().toISOString().split("T")[0]}
-                onChange={(e) => onStartDateChange(e.target.value)}
-                className="w-full px-3 py-2 text-sm font-medium border-2 border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white hover:border-indigo-400 transition-colors"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                End Date
-              </label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => onEndDateChange(e.target.value)}
-                className="w-full px-3 py-2 text-sm font-medium border-2 border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white hover:border-indigo-400 transition-colors"
-              />
-            </div>
-            <button
-              onClick={onCurrentWeekClick}
-              className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg whitespace-nowrap"
-            >
-              Current Week
-            </button>
-          </div>
         </div>
       </div>
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link, LinkClick, supabase } from "@/lib/supabase";
+import { fetchAllClicksForLinkId } from "@/lib/supabase-pagination";
 import {
   ArrowLeft,
   ArrowDown,
@@ -19,6 +20,18 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { ClicksAnalyticsChart } from "./ClicksAnalyticsChart";
+import { GeoInsightsPanelClient } from "./GeoInsightsPanelLazy";
+import { AnalyticsDateRangePicker } from "./AnalyticsDateRangePicker";
+import { filterClicksInDateRange } from "@/lib/click-aggregation";
+import {
+  buildTrackingUrlExample,
+  buildTrackingUrlTemplate,
+} from "@/lib/tracking-url";
+import { formatDateRangeLabel } from "@/lib/analytics-date-range";
+import {
+  ANALYTICS_DATE_RANGE_STORAGE_KEYS,
+  useAnalyticsDateRange,
+} from "@/hooks/useAnalyticsDateRange";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -160,9 +173,7 @@ function computeAnalyticsFromClicks(
 
     if (click.clicked_at) {
       const dateString = getDateString(new Date(click.clicked_at));
-      if (dateString >= startDate && dateString <= endDate) {
-        dailyClicksMap[dateString] = (dailyClicksMap[dateString] || 0) + 1;
-      }
+      dailyClicksMap[dateString] = (dailyClicksMap[dateString] || 0) + 1;
     }
   });
 
@@ -242,6 +253,9 @@ function hasActiveFilters(filters: ClickFilters): boolean {
 type CreatorTableSortColumn =
   | "lastClick"
   | "creator"
+  | "country"
+  | "state"
+  | "city"
   | "totalClicks"
   | "totalSubmissions";
 type SortDirection = "asc" | "desc";
@@ -251,7 +265,39 @@ type CreatorTableRow = {
   totalClicks: number;
   lastClick: string;
   submissions: Set<string>;
+  countries: Set<string>;
+  states: Set<string>;
+  cities: Set<string>;
 };
+
+function sortedLocationValues(values: Set<string>): string[] {
+  return [...values].filter(Boolean).sort((a, b) => a.localeCompare(b));
+}
+
+function compareLocationSets(a: Set<string>, b: Set<string>): number {
+  const aLabel = sortedLocationValues(a).join(", ");
+  const bLabel = sortedLocationValues(b).join(", ");
+  if (!aLabel && !bLabel) return 0;
+  if (!aLabel) return 1;
+  if (!bLabel) return -1;
+  return aLabel.localeCompare(bLabel);
+}
+
+function renderCreatorLocationCell(values: Set<string>) {
+  const list = sortedLocationValues(values);
+  if (list.length === 0) {
+    return <span className="text-slate-400">-</span>;
+  }
+  const label = list.join(", ");
+  return (
+    <span
+      className="block max-w-[10rem] sm:max-w-[12rem] truncate text-slate-700"
+      title={label}
+    >
+      {label}
+    </span>
+  );
+}
 
 function buildCreatorRows(clicks: LinkClick[]): CreatorTableRow[] {
   const creatorMap = new Map<string, CreatorTableRow>();
@@ -264,6 +310,9 @@ function buildCreatorRows(clicks: LinkClick[]): CreatorTableRow[] {
       existing.totalClicks++;
       if (click.submission_number)
         existing.submissions.add(click.submission_number);
+      if (click.country) existing.countries.add(click.country);
+      if (click.state) existing.states.add(click.state);
+      if (click.city) existing.cities.add(click.city);
       if (click.clicked_at && click.clicked_at > existing.lastClick) {
         existing.lastClick = click.clicked_at;
       }
@@ -275,6 +324,9 @@ function buildCreatorRows(clicks: LinkClick[]): CreatorTableRow[] {
         submissions: new Set(
           click.submission_number ? [click.submission_number] : []
         ),
+        countries: new Set(click.country ? [click.country] : []),
+        states: new Set(click.state ? [click.state] : []),
+        cities: new Set(click.city ? [click.city] : []),
       });
     }
   });
@@ -298,6 +350,15 @@ function sortCreatorRows(
       case "creator":
         cmp = a.username.localeCompare(b.username);
         break;
+      case "country":
+        cmp = compareLocationSets(a.countries, b.countries);
+        break;
+      case "state":
+        cmp = compareLocationSets(a.states, b.states);
+        break;
+      case "city":
+        cmp = compareLocationSets(a.cities, b.cities);
+        break;
       case "totalClicks":
         cmp = a.totalClicks - b.totalClicks;
         break;
@@ -314,6 +375,7 @@ interface AnalyticsProps {
   link: Link;
   onBack: () => void;
   projectSlug: string;
+  brandSlug?: string | null;
 }
 
 interface AnalyticsData {
@@ -330,7 +392,14 @@ interface AnalyticsData {
   filteredClicks: LinkClick[];
 }
 
-export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
+type AnalyticsViewMode = "map" | "detailed";
+
+export function Analytics({
+  link,
+  onBack,
+  projectSlug,
+  brandSlug = null,
+}: AnalyticsProps) {
   const [allClicks, setAllClicks] = useState<LinkClick[]>([]);
   const [clickFilters, setClickFilters] =
     useState<ClickFilters>(DEFAULT_CLICK_FILTERS);
@@ -338,22 +407,15 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
     useState<ClickFilters>(DEFAULT_CLICK_FILTERS);
   const [loading, setLoading] = useState(true);
   const [selectedCreator, setSelectedCreator] = useState<string | null>(null);
-  const [startDate, setStartDate] = useState<string>(() => {
-    // Initialize with Monday of current week
-    const today = new Date();
-    const day = today.getDay();
-    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(today.setDate(diff));
-    return monday.toISOString().split("T")[0];
-  });
-  const [endDate, setEndDate] = useState<string>(() => {
-    // Initialize with Sunday of current week
-    const today = new Date();
-    const day = today.getDay();
-    const diff = today.getDate() - day + (day === 0 ? 0 : 7);
-    const sunday = new Date(today.setDate(diff));
-    return sunday.toISOString().split("T")[0];
-  });
+  const {
+    rangePreset,
+    startDate,
+    endDate,
+    allTimeRange,
+    applyPreset,
+    handleStartDateChange,
+    handleEndDateChange,
+  } = useAnalyticsDateRange(ANALYTICS_DATE_RANGE_STORAGE_KEYS.project, allClicks);
   const [creatorAnalytics, setCreatorAnalytics] = useState<{
     clicks: LinkClick[];
     totalClicks: number;
@@ -369,19 +431,15 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
     column: CreatorTableSortColumn;
     direction: SortDirection;
   }>({ column: "lastClick", direction: "desc" });
+  const [analyticsViewMode, setAnalyticsViewMode] =
+    useState<AnalyticsViewMode>("detailed");
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
 
   const loadAnalytics = useCallback(async () => {
     try {
-      const { data: clicks, error } = await supabase
-        .from("link_clicks")
-        .select("*")
-        .eq("link_id", link.id)
-        .order("clicked_at", { ascending: false });
-
-      if (error) throw error;
-      setAllClicks(clicks || []);
+      const clicks = await fetchAllClicksForLinkId(supabase, link.id);
+      setAllClicks(clicks);
     } catch (error) {
       console.error("Error loading analytics:", error);
     } finally {
@@ -417,15 +475,25 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
     [allClicks, clickFilters]
   );
 
+  const dateFilteredClicks = useMemo(
+    () => filterClicksInDateRange(filteredClicks, startDate, endDate),
+    [filteredClicks, startDate, endDate]
+  );
+
   const data = useMemo(
     () =>
       computeAnalyticsFromClicks(
-        filteredClicks,
+        dateFilteredClicks,
         link,
         startDate,
         endDate
       ),
-    [filteredClicks, link, startDate, endDate]
+    [dateFilteredClicks, link, startDate, endDate]
+  );
+
+  const dateRangeLabel = useMemo(
+    () => formatDateRangeLabel(startDate, endDate),
+    [startDate, endDate]
   );
 
   const exportRows = useMemo(
@@ -842,19 +910,16 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
 
   const loadCreatorAnalytics = async (creatorUsername: string) => {
     try {
-      const { data: clicks, error } = await supabase
-        .from("link_clicks")
-        .select("*")
-        .eq("link_id", link.id)
-        .eq("creator_username", creatorUsername)
-        .order("clicked_at", { ascending: false });
-
-      if (error) throw error;
+      const clicks = await fetchAllClicksForLinkId(supabase, link.id, {
+        creatorUsername,
+      });
 
       // Get all unique submissions
       const allSubmissions = Array.from(
         new Set(
-          clicks?.map((click) => click.submission_number).filter(Boolean) || []
+          clicks
+            .map((click) => click.submission_number)
+            .filter((s): s is string => Boolean(s))
         )
       ).sort((a, b) => {
         const aIsNumeric = !isNaN(Number(a));
@@ -869,8 +934,8 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
       });
 
       const analytics = {
-        clicks: clicks || [],
-        totalClicks: clicks?.length || 0,
+        clicks,
+        totalClicks: clicks.length,
         clicksBySubmission: {} as Record<string, number>,
         clicksByCountry: {} as Record<string, number>,
         clicksByState: {} as Record<string, number>,
@@ -880,7 +945,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
         allSubmissions,
       };
 
-      clicks?.forEach((click) => {
+      clicks.forEach((click) => {
         if (click.submission_number) {
           analytics.clicksBySubmission[click.submission_number] =
             (analytics.clicksBySubmission[click.submission_number] || 0) + 1;
@@ -915,9 +980,27 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
     }
   };
 
-  const baseUrl = window.location.origin;
-  const trackingUrl = `${baseUrl}/${projectSlug}/${link.short_code}`;
-  const exampleUrl = `${trackingUrl}/johndoe/sub1`;
+  const includeSub = link.include_submission_in_url ?? false;
+  const trackingUrlTemplate =
+    typeof window !== "undefined"
+      ? buildTrackingUrlTemplate({
+          baseUrl: window.location.origin,
+          brandSlug,
+          projectSlug,
+          shortCode: link.short_code,
+          includeSubmissionInUrl: includeSub,
+        })
+      : "";
+  const exampleUrl =
+    typeof window !== "undefined"
+      ? buildTrackingUrlExample({
+          baseUrl: window.location.origin,
+          brandSlug,
+          projectSlug,
+          shortCode: link.short_code,
+          includeSubmissionInUrl: includeSub,
+        })
+      : "";
 
   if (loading) {
     return (
@@ -1082,7 +1165,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
             <div>
               <p className="text-xs text-slate-600 mb-2 font-medium">Format:</p>
               <code className="block bg-white px-3 sm:px-4 py-3 rounded-xl font-mono text-xs sm:text-sm text-slate-800 overflow-x-auto shadow-sm border border-slate-200">
-                {trackingUrl}/[creator]/sub1
+                {trackingUrlTemplate}
               </code>
             </div>
             <div>
@@ -1104,75 +1187,85 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
           hasActive={hasActiveFilters(clickFilters)}
           totalUnfiltered={allClicks.length}
           totalFiltered={filteredClicks.length}
+          viewMode={analyticsViewMode}
+          onViewModeChange={setAnalyticsViewMode}
         />
 
-        {/* Clicks Bar Chart */}
-        <ClicksAnalyticsChart
-          weeklyData={data.clicksByWeek}
-          startDate={startDate}
-          endDate={endDate}
-          onStartDateChange={setStartDate}
-          onEndDateChange={setEndDate}
-          onCurrentWeekClick={() => {
-            const today = new Date();
-            const day = today.getDay();
-            const mondayDiff = today.getDate() - day + (day === 0 ? -6 : 1);
-            const sundayDiff = today.getDate() - day + (day === 0 ? 0 : 7);
-
-            const monday = new Date(today);
-            monday.setDate(mondayDiff);
-            const sunday = new Date(today);
-            sunday.setDate(sundayDiff);
-
-            setStartDate(monday.toISOString().split("T")[0]);
-            setEndDate(sunday.toISOString().split("T")[0]);
-          }}
-        />
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <StatsCard
-            title="Clicks by Link Title"
-            data={data.clicksByLinkTitle}
-            color="blue"
-          />
-          <StatsCard
-            title="Clicks by Creator"
-            data={data.clicksByCreator}
-            color="emerald"
-          />
-          <StatsCard
-            title="Clicks by Submission"
-            data={data.clicksBySubmission}
-            color="orange"
-          />
-          <StatsCard
-            title="Clicks by Country"
-            data={data.clicksByCountry}
-            color="cyan"
-          />
-          <StatsCard
-            title="Clicks by State"
-            data={data.clicksByState}
-            color="amber"
-          />
-          <StatsCard
-            title="Clicks by City"
-            data={data.clicksByCity}
-            color="violet"
-          />
-          <StatsCard
-            title="Clicks by Device"
-            data={data.clicksByDevice}
-            color="green"
-          />
-          <StatsCard
-            title="Clicks by Browser"
-            data={data.clicksByBrowser}
-            color="slate"
+        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-4 sm:p-5 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+            <p className="text-sm text-slate-600">
+              <span className="font-semibold text-slate-800">{dateRangeLabel}</span>
+              {" · "}
+              {data.totalClicks.toLocaleString()} clicks in range
+            </p>
+          </div>
+          <AnalyticsDateRangePicker
+            preset={rangePreset}
+            startDate={startDate}
+            endDate={endDate}
+            onPresetChange={applyPreset}
+            onStartDateChange={handleStartDateChange}
+            onEndDateChange={handleEndDateChange}
+            minDate={allTimeRange.startDate}
+            maxDate={allTimeRange.endDate}
           />
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200/60 p-4 sm:p-6 overflow-hidden">
+        {analyticsViewMode === "map" ? (
+          <GeoInsightsPanelClient clicks={dateFilteredClicks} />
+        ) : (
+          <>
+            <ClicksAnalyticsChart
+              weeklyData={data.clicksByWeek}
+              startDate={startDate}
+              endDate={endDate}
+              totalClicksInRange={data.totalClicks}
+            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <StatsCard
+                title="Clicks by Link Title"
+                data={data.clicksByLinkTitle}
+                color="blue"
+              />
+              <StatsCard
+                title="Clicks by Creator"
+                data={data.clicksByCreator}
+                color="emerald"
+              />
+              <StatsCard
+                title="Clicks by Submission"
+                data={data.clicksBySubmission}
+                color="orange"
+              />
+              <StatsCard
+                title="Clicks by Country"
+                data={data.clicksByCountry}
+                color="cyan"
+              />
+              <StatsCard
+                title="Clicks by State"
+                data={data.clicksByState}
+                color="amber"
+              />
+              <StatsCard
+                title="Clicks by City"
+                data={data.clicksByCity}
+                color="violet"
+              />
+              <StatsCard
+                title="Clicks by Device"
+                data={data.clicksByDevice}
+                color="green"
+              />
+              <StatsCard
+                title="Clicks by Browser"
+                data={data.clicksByBrowser}
+                color="slate"
+              />
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-lg border border-slate-200/60 p-4 sm:p-6 overflow-hidden">
           <div className="flex items-center gap-3 mb-4 sm:mb-6">
             <div className="p-2 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg">
               <Users className="w-5 h-5 text-white" />
@@ -1215,6 +1308,9 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
                             label: "Last Click",
                           },
                           { key: "creator" as const, label: "Creator" },
+                          { key: "country" as const, label: "Country" },
+                          { key: "state" as const, label: "State" },
+                          { key: "city" as const, label: "City" },
                           {
                             key: "totalClicks" as const,
                             label: "Total Clicks",
@@ -1288,6 +1384,15 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
                               <span>{creator.username}</span>
                             </div>
                           </td>
+                          <td className="py-3 sm:py-4 px-3 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+                            {renderCreatorLocationCell(creator.countries)}
+                          </td>
+                          <td className="py-3 sm:py-4 px-3 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+                            {renderCreatorLocationCell(creator.states)}
+                          </td>
+                          <td className="py-3 sm:py-4 px-3 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+                            {renderCreatorLocationCell(creator.cities)}
+                          </td>
                           <td className="py-3 sm:py-4 px-3 sm:px-4 text-xs sm:text-sm text-slate-900 whitespace-nowrap">
                             <span className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 rounded-full font-bold shadow-sm">
                               {creator.totalClicks}
@@ -1322,13 +1427,15 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
 
       {/* Creator Analytics Modal */}
       {selectedCreator && creatorAnalytics && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="clickable-backdrop absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => {
               setSelectedCreator(null);
               setCreatorAnalytics(null);
@@ -1807,6 +1914,8 @@ function AnalyticsFiltersBar({
   totalUnfiltered,
   totalFiltered,
   compact = false,
+  viewMode,
+  onViewModeChange,
 }: {
   filters: ClickFilters;
   options: ReturnType<typeof extractFilterOptions>;
@@ -1816,6 +1925,8 @@ function AnalyticsFiltersBar({
   totalUnfiltered: number;
   totalFiltered: number;
   compact?: boolean;
+  viewMode?: AnalyticsViewMode;
+  onViewModeChange?: (mode: AnalyticsViewMode) => void;
 }) {
   const selectClass =
     "w-full px-3 py-2 text-sm font-medium border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white hover:border-slate-400 transition-colors";
@@ -1874,15 +1985,40 @@ function AnalyticsFiltersBar({
             </p>
           </div>
         </div>
-        {hasActive && (
+        {viewMode && onViewModeChange && !compact ? (
+          <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1 self-start sm:self-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => onViewModeChange("detailed")}
+              className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition ${
+                viewMode === "detailed"
+                  ? "bg-white text-blue-700 shadow-sm"
+                  : "text-slate-600 hover:text-slate-800"
+              }`}
+            >
+              Detailed View
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewModeChange("map")}
+              className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition ${
+                viewMode === "map"
+                  ? "bg-white text-blue-700 shadow-sm"
+                  : "text-slate-600 hover:text-slate-800"
+              }`}
+            >
+              Map View
+            </button>
+          </div>
+        ) : hasActive ? (
           <button
             type="button"
             onClick={onClear}
-            className="text-sm font-semibold text-violet-600 hover:text-violet-800 px-4 py-2 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors border border-violet-200 self-start sm:self-auto"
+            className="text-sm font-semibold text-violet-600 hover:text-violet-800 px-4 py-2 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors border border-violet-200 self-start sm:self-auto shrink-0"
           >
             Clear all filters
           </button>
-        )}
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
@@ -1939,8 +2075,16 @@ function AnalyticsFiltersBar({
               </span>
             );
           })}
+          <button
+            type="button"
+            onClick={onClear}
+            className="ml-auto text-sm font-semibold text-violet-600 hover:text-violet-800 px-4 py-2 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors border border-violet-200"
+          >
+            Clear all filters
+          </button>
         </div>
       )}
+
     </div>
   );
 }

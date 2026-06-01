@@ -3,6 +3,8 @@
  */
 
 import { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAllPages } from "@/lib/supabase-pagination";
+import { slugifyName } from "@/lib/slug-utils";
 
 /**
  * Generate a random project slug with configurable format
@@ -137,14 +139,14 @@ export async function generateUniqueProjectSlug(
   for (const [letterCount, numberCount] of formats) {
     // For single letters, try to find an available one directly
     if (letterCount === 1 && numberCount === 0) {
-      const { data: allProjects } = await supabase
-        .from("projects")
-        .select("slug");
+      const allProjects = await fetchAllPages(async (from, to) =>
+        supabase.from("projects").select("slug").range(from, to)
+      );
 
       const takenLetters = new Set(
         allProjects
-          ?.map((p) => p.slug)
-          .filter((slug) => slug.length === 1 && /^[a-z]$/.test(slug)) || []
+          .map((p) => p.slug)
+          .filter((slug) => slug.length === 1 && /^[a-z]$/.test(slug))
       );
 
       const letters = "abcdefghijklmnopqrstuvwxyz".split("");
@@ -253,4 +255,44 @@ export async function generateUniqueProjectShortCode(
 
   // Fallback: add timestamp to make it unique
   return generateRandomShortCode() + Date.now().toString().slice(-2);
+}
+
+export async function isBrandSlugUniqueForUser(
+  slug: string,
+  userId: string,
+  supabase: SupabaseClient,
+  excludeBrandId?: string
+): Promise<boolean> {
+  let query = supabase
+    .from("brands")
+    .select("id")
+    .eq("user_id", userId)
+    .ilike("slug", slug);
+
+  if (excludeBrandId) {
+    query = query.neq("id", excludeBrandId);
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (error && error.code !== "PGRST116") {
+    console.error("Brand slug check error:", error);
+  }
+  return !data;
+}
+
+export async function generateUniqueBrandSlug(
+  name: string,
+  userId: string,
+  supabase: SupabaseClient
+): Promise<string> {
+  const base = slugifyName(name);
+  let candidate = base;
+  let n = 0;
+
+  while (!(await isBrandSlugUniqueForUser(candidate, userId, supabase))) {
+    n += 1;
+    candidate = `${base}-${n}`;
+  }
+
+  return candidate;
 }

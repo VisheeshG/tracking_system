@@ -1,66 +1,121 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase, Project } from "@/lib/supabase";
-import { ProjectList } from "./ProjectList";
+import { supabase, Project, Brand } from "@/lib/supabase";
+import { ProjectList, ProjectWithStats } from "./ProjectList";
+import { BrandList, BrandWithStats } from "./BrandList";
 import { DashboardStatsCards } from "./DashboardStatsCards";
 import { TitleSearchBar } from "./TitleSearchBar";
+import { NewProjectForm } from "./NewProjectForm";
+import { NewBrandForm } from "./NewBrandForm";
 import { matchesTitleQuery } from "@/lib/search";
-import { generateUniqueProjectSlug } from "@/lib/generators";
-import { LogOut, Plus, FolderOpen } from "lucide-react";
+import {
+  fetchStatsForProjectIds,
+  fetchStatsMapForProjectIds,
+} from "@/lib/project-stats";
+import { generateUniqueBrandSlug } from "@/lib/generators";
+import { isValidSlug, slugifyName } from "@/lib/slug-utils";
+import { LogOut, Plus, FolderOpen, Briefcase } from "lucide-react";
 import toast from "react-hot-toast";
 
 export function Dashboard() {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
   const [totalLinks, setTotalLinks] = useState(0);
   const [totalClicks, setTotalClicks] = useState(0);
   const [showNewProject, setShowNewProject] = useState(false);
+  const [showNewBrand, setShowNewBrand] = useState(false);
+  const [brandSearch, setBrandSearch] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
 
-  const filteredProjects = useMemo(
-    () =>
-      projects.filter((p) => matchesTitleQuery(projectSearch, p.name)),
-    [projects, projectSearch]
+  const unbrandedProjects = useMemo(
+    () => projects.filter((p) => !p.brand_id),
+    [projects]
   );
 
-  const loadDashboardStats = useCallback(async (projectIds: string[]) => {
-    if (projectIds.length === 0) {
-      setTotalLinks(0);
-      setTotalClicks(0);
-      setStatsLoading(false);
+  const matchedBrands = useMemo(
+    () => brands.filter((b) => matchesTitleQuery(brandSearch, b.name)),
+    [brands, brandSearch]
+  );
+
+  const [brandsWithStats, setBrandsWithStats] = useState<BrandWithStats[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadBrandStats = async () => {
+      const withStats: BrandWithStats[] = await Promise.all(
+        matchedBrands.map(async (brand) => {
+          const brandProjects = projects.filter((p) => p.brand_id === brand.id);
+          const stats = await fetchStatsForProjectIds(
+            brandProjects.map((p) => p.id)
+          );
+          return {
+            ...brand,
+            projectCount: brandProjects.length,
+            linkCount: stats.linkCount,
+            clickCount: stats.clickCount,
+          };
+        })
+      );
+      if (!cancelled) setBrandsWithStats(withStats);
+    };
+
+    if (matchedBrands.length === 0) {
+      setBrandsWithStats([]);
       return;
     }
 
+    void loadBrandStats();
+    return () => {
+      cancelled = true;
+    };
+  }, [matchedBrands, projects]);
+
+  const [unbrandedStatsMap, setUnbrandedStatsMap] = useState<
+    Record<string, { linkCount: number; clickCount: number }>
+  >({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const ids = unbrandedProjects.map((p) => p.id);
+
+    if (ids.length === 0) {
+      setUnbrandedStatsMap({});
+      return;
+    }
+
+    void fetchStatsMapForProjectIds(ids).then((map) => {
+      if (!cancelled) setUnbrandedStatsMap(map);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [unbrandedProjects]);
+
+  const filteredUnbrandedWithStats = useMemo((): ProjectWithStats[] => {
+    return unbrandedProjects
+      .filter((p) => matchesTitleQuery(projectSearch, p.name))
+      .map((p) => ({
+        ...p,
+        linkCount: unbrandedStatsMap[p.id]?.linkCount ?? 0,
+        clickCount: unbrandedStatsMap[p.id]?.clickCount ?? 0,
+      }));
+  }, [unbrandedProjects, projectSearch, unbrandedStatsMap]);
+
+  const loadDashboardStats = useCallback(async (projectIds: string[]) => {
+    setStatsLoading(true);
     try {
-      const { data: links, error: linksError } = await supabase
-        .from("links")
-        .select("id")
-        .in("project_id", projectIds);
-
-      if (linksError) throw linksError;
-
-      const linkCount = links?.length ?? 0;
-      setTotalLinks(linkCount);
-
-      if (!links || links.length === 0) {
-        setTotalClicks(0);
-        return;
-      }
-
-      const linkIds = links.map((l) => l.id);
-      const { count, error: clicksError } = await supabase
-        .from("link_clicks")
-        .select("*", { count: "exact", head: true })
-        .in("link_id", linkIds);
-
-      if (clicksError) throw clicksError;
-      setTotalClicks(count ?? 0);
+      const stats = await fetchStatsForProjectIds(projectIds);
+      setTotalLinks(stats.linkCount);
+      setTotalClicks(stats.clickCount);
     } catch (error) {
       console.error("Error loading dashboard stats:", error);
     } finally {
@@ -68,23 +123,36 @@ export function Dashboard() {
     }
   }, []);
 
-  const loadProjects = useCallback(async () => {
+  const loadData = useCallback(async () => {
     if (!user) return;
 
     setStatsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      const [brandsRes, projectsRes] = await Promise.all([
+        supabase
+          .from("brands")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("projects")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false }),
+      ]);
 
-      if (error) throw error;
-      const projectList = data || [];
+      if (brandsRes.error) throw brandsRes.error;
+      if (projectsRes.error) throw projectsRes.error;
+
+      const projectList = (projectsRes.data || []).map((p) => ({
+        ...p,
+        brand_id: p.brand_id ?? null,
+      }));
+      setBrands(brandsRes.data || []);
       setProjects(projectList);
       await loadDashboardStats(projectList.map((p) => p.id));
     } catch (error) {
-      console.error("Error loading projects:", error);
+      console.error("Error loading dashboard:", error);
       setStatsLoading(false);
     } finally {
       setLoading(false);
@@ -92,30 +160,123 @@ export function Dashboard() {
   }, [user, loadDashboardStats]);
 
   useEffect(() => {
-    loadProjects();
-  }, [user, loadProjects]);
+    loadData();
+  }, [user, loadData]);
 
-  // Close the New Project modal on Escape key
   useEffect(() => {
-    if (!showNewProject) return;
+    if (!showNewProject && !showNewBrand) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setShowNewProject(false);
+        setShowNewBrand(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showNewProject]);
+  }, [showNewProject, showNewBrand]);
 
-  const handleCreateProject = async (
+  const handleCreateBrand = async (
     name: string,
     description: string,
-    slug: string
+    slugInput: string
   ) => {
     if (!user) return false;
 
     try {
-      // Prevent duplicate project names per user (case-insensitive)
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        toast.error("Brand name is required");
+        return false;
+      }
+
+      const trimmedSlug = (slugInput.trim() || slugifyName(trimmedName)).toLowerCase();
+      if (!isValidSlug(trimmedSlug)) {
+        toast.error(
+          "Brand URL slug must be 2–48 characters: lowercase letters, numbers, and hyphens only."
+        );
+        return false;
+      }
+
+      const { data: existing, error: existingError } = await supabase
+        .from("brands")
+        .select("id")
+        .eq("user_id", user.id)
+        .ilike("name", trimmedName);
+
+      if (existingError) throw existingError;
+      if (existing && existing.length > 0) {
+        toast.error("A brand with this name already exists.");
+        return false;
+      }
+
+      const slugUnique = await generateUniqueBrandSlug(trimmedName, user.id, supabase);
+      const finalSlug =
+        trimmedSlug === slugifyName(trimmedName) ? slugUnique : trimmedSlug;
+
+      const { data: slugTaken } = await supabase
+        .from("brands")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("slug", finalSlug)
+        .maybeSingle();
+
+      if (slugTaken) {
+        toast.error(`Brand slug "${finalSlug}" is already in use.`);
+        return false;
+      }
+
+      const { data, error } = await supabase
+        .from("brands")
+        .insert({
+          user_id: user.id,
+          name: trimmedName,
+          slug: finalSlug,
+          description: description.trim() || null,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setBrands([data, ...brands]);
+      setShowNewBrand(false);
+      toast.success("Brand created");
+      return true;
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Error creating brand"
+      );
+      return false;
+    }
+  };
+
+  const handleDeleteBrand = async (brandId: string) => {
+    try {
+      const { error } = await supabase.from("brands").delete().eq("id", brandId);
+      if (error) throw error;
+
+      setBrands(brands.filter((b) => b.id !== brandId));
+      const updatedProjects = projects.map((p) =>
+        p.brand_id === brandId ? { ...p, brand_id: null } : p
+      );
+      setProjects(updatedProjects);
+      toast.success("Brand deleted. Projects moved to Unbranded.");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Error deleting brand"
+      );
+    }
+  };
+
+  const handleCreateProject = async (
+    name: string,
+    description: string,
+    slug: string,
+    brandId: string | null
+  ) => {
+    if (!user) return false;
+
+    try {
       const trimmedName = name.trim();
       if (!trimmedName) {
         toast.error("Project name is required");
@@ -140,7 +301,6 @@ export function Dashboard() {
         return false;
       }
 
-      // Check if slug already exists (across all users)
       const { data: existingSlug, error: slugError } = await supabase
         .from("projects")
         .select("id")
@@ -160,14 +320,14 @@ export function Dashboard() {
         .insert({
           user_id: user.id,
           name: trimmedName,
-          description,
+          description: description.trim() || null,
           slug: trimmedSlug,
+          brand_id: brandId,
         })
         .select()
         .single();
 
       if (error) {
-        // Check if error is due to duplicate slug constraint
         if (error.code === "23505" && error.message.includes("slug")) {
           toast.error(
             `Project slug "${trimmedSlug}" is already taken. Choose a different slug.`,
@@ -178,9 +338,10 @@ export function Dashboard() {
         throw error;
       }
 
-      setProjects([data, ...projects]);
+      const normalized = { ...data, brand_id: data.brand_id ?? null };
+      setProjects([normalized, ...projects]);
       setShowNewProject(false);
-      // Navigate to the new project
+      await loadDashboardStats([normalized, ...projects].map((p) => p.id));
       router.push(`/dashboard/${data.id}`);
       return true;
     } catch (error: unknown) {
@@ -188,6 +349,35 @@ export function Dashboard() {
         error instanceof Error ? error.message : "Error creating project"
       );
       return false;
+    }
+  };
+
+  const handleMoveToBrand = async (
+    projectId: string,
+    brandId: string | null
+  ) => {
+    try {
+      const { data, error } = await supabase
+        .from("projects")
+        .update({ brand_id: brandId })
+        .eq("id", projectId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setProjects(
+        projects.map((p) =>
+          p.id === projectId
+            ? { ...p, brand_id: data.brand_id ?? null }
+            : p
+        )
+      );
+      toast.success(brandId ? "Project moved to brand" : "Project unbranded");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Error moving project"
+      );
     }
   };
 
@@ -241,9 +431,6 @@ export function Dashboard() {
           <p className="text-slate-700 font-semibold text-lg">
             Loading dashboard...
           </p>
-          <p className="text-slate-500 text-sm mt-1">
-            Please wait while we fetch your projects
-          </p>
         </div>
       </div>
     );
@@ -252,6 +439,12 @@ export function Dashboard() {
   const handleSelectProject = (project: Project) => {
     router.push(`/dashboard/${project.id}`);
   };
+
+  const handleSelectBrand = (brand: Brand) => {
+    router.push(`/dashboard/brands/${brand.id}`);
+  };
+
+  const hasAnyContent = brands.length > 0 || projects.length > 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50">
@@ -283,351 +476,160 @@ export function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-6 sm:py-8 lg:py-10">
-      <DashboardStatsCards
-              totalProjects={projects.length}
-              totalLinks={totalLinks}
-              totalClicks={totalClicks}
-              loading={statsLoading}
-            />
-        <div className="mb-8 sm:mb-10">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0 mb-6 sm:mb-8">
-            <div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
-                Your Projects
-              </h2>
-              <p className="text-sm sm:text-base text-slate-600 font-medium">
-                Create and manage your link tracking campaigns
-              </p>
-            </div>
+        <DashboardStatsCards
+          totalProjects={projects.length}
+          totalLinks={totalLinks}
+          totalClicks={totalClicks}
+          loading={statsLoading}
+        />
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+          <div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
+              Dashboard
+            </h2>
+            <p className="text-sm sm:text-base text-slate-600 font-medium">
+              Organize campaigns by brand
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => setShowNewBrand(true)}
+              className="flex items-center justify-center space-x-2 bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 text-white px-5 py-3 rounded-xl transition-all font-semibold shadow-lg w-full sm:w-auto"
+            >
+              <Briefcase className="w-5 h-5" />
+              <span>New Brand</span>
+            </button>
             <button
               onClick={() => setShowNewProject(true)}
-              className="group flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-5 sm:px-6 py-3 rounded-xl transition-all duration-200 font-semibold shadow-lg hover:shadow-xl w-full sm:w-auto hover:scale-105"
+              className="flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-5 py-3 rounded-xl transition-all font-semibold shadow-lg w-full sm:w-auto"
             >
-              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200" />
+              <Plus className="w-5 h-5" />
               <span>New Project</span>
             </button>
           </div>
         </div>
 
-        {projects.length === 0 ? (
-          <div className="bg-white rounded-2xl border-2 border-dashed border-slate-300 p-8 sm:p-12 lg:p-16 text-center shadow-sm">
-            <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl mb-6">
-              <FolderOpen className="w-10 h-10 sm:w-12 sm:h-12 text-blue-600" />
-            </div>
-            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3">
-              No projects yet
+        {!hasAnyContent ? (
+          <div className="bg-white rounded-2xl border-2 border-dashed border-slate-300 p-8 sm:p-12 text-center shadow-sm">
+            <h3 className="text-xl font-bold text-slate-900 mb-3">
+              Get started
             </h3>
-            <p className="text-sm sm:text-base text-slate-600 mb-6 sm:mb-8 max-w-md mx-auto">
-              Create your first project to start tracking links and analyzing
-              your campaign performance
+            <p className="text-slate-600 mb-6 max-w-md mx-auto">
+              Create a brand to group related projects, or add a project
+              directly.
             </p>
-            <button
-              onClick={() => setShowNewProject(true)}
-              className="group inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-4 rounded-xl transition-all duration-200 font-semibold shadow-lg hover:shadow-xl hover:scale-105"
-            >
-              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200" />
-              <span>Create Project</span>
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                onClick={() => setShowNewBrand(true)}
+                className="inline-flex items-center justify-center space-x-2 bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 rounded-xl font-semibold"
+              >
+                <Briefcase className="w-5 h-5" />
+                <span>Create Brand</span>
+              </button>
+              <button
+                onClick={() => setShowNewProject(true)}
+                className="inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Create Project</span>
+              </button>
+            </div>
           </div>
         ) : (
           <>
-            <TitleSearchBar
-              value={projectSearch}
-              onChange={setProjectSearch}
-              placeholder="Search projects by title..."
-              className="mb-6 max-w-md"
-            />
-        
-            {filteredProjects.length === 0 ? (
-              <div className="bg-white rounded-xl border border-slate-200 p-8 text-center shadow-sm">
-                <p className="text-slate-600">
-                  No projects match &quot;{projectSearch.trim()}&quot;.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setProjectSearch("")}
-                  className="mt-3 text-sm font-semibold text-blue-600 hover:text-blue-700"
-                >
-                  Clear search
-                </button>
-              </div>
-            ) : (
-              <ProjectList
-                projects={filteredProjects}
-                onSelectProject={handleSelectProject}
-                onDeleteProject={handleDeleteProject}
-              />
+            {brands.length > 0 && (
+              <section className="mb-10">
+                <h3 className="text-xl font-bold text-slate-900 mb-4">
+                  Your Brands
+                </h3>
+                <TitleSearchBar
+                  value={brandSearch}
+                  onChange={setBrandSearch}
+                  placeholder="Search brands by name..."
+                  className="mb-6 max-w-md"
+                />
+                {brandsWithStats.length === 0 && brandSearch.trim() ? (
+                  <p className="text-slate-600 text-sm">
+                    No brands match &quot;{brandSearch.trim()}&quot;.
+                  </p>
+                ) : (
+                  <BrandList
+                    brands={brandsWithStats}
+                    onSelectBrand={handleSelectBrand}
+                    onDeleteBrand={handleDeleteBrand}
+                  />
+                )}
+              </section>
             )}
+
+            <section>
+              <h3 className="text-xl font-bold text-slate-900 mb-4">
+                Unbranded Projects
+              </h3>
+              {unbrandedProjects.length === 0 ? (
+                <p className="text-sm text-slate-600 mb-4">
+                  All projects are assigned to a brand. Open a brand to see them,
+                  or create a new unbranded project.
+                </p>
+              ) : (
+                <>
+                  <TitleSearchBar
+                    value={projectSearch}
+                    onChange={setProjectSearch}
+                    placeholder="Search projects by title..."
+                    className="mb-6 max-w-md"
+                  />
+                  {filteredUnbrandedWithStats.length === 0 ? (
+                    <p className="text-slate-600 text-sm">
+                      No projects match &quot;{projectSearch.trim()}&quot;.
+                    </p>
+                  ) : (
+                    <ProjectList
+                      projects={filteredUnbrandedWithStats}
+                      brands={brands}
+                      onSelectProject={handleSelectProject}
+                      onDeleteProject={handleDeleteProject}
+                      onMoveToBrand={handleMoveToBrand}
+                    />
+                  )}
+                </>
+              )}
+            </section>
           </>
         )}
       </main>
 
       {showNewProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="clickable-backdrop absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setShowNewProject(false)}
           />
-          <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-4 duration-300">
+          <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <NewProjectForm
+              brands={brands}
               onSubmit={handleCreateProject}
               onCancel={() => setShowNewProject(false)}
             />
           </div>
         </div>
       )}
-    </div>
-  );
-}
 
-function NewProjectForm({
-  onSubmit,
-  onCancel,
-}: {
-  onSubmit: (
-    name: string,
-    description: string,
-    slug: string
-  ) => Promise<boolean>;
-  onCancel: () => void;
-}) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [slug, setSlug] = useState("");
-  const [slugMode, setSlugMode] = useState<"auto" | "custom">("auto");
-  const [isGeneratingSlug, setIsGeneratingSlug] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleGenerateSlug = async () => {
-    setIsGeneratingSlug(true);
-    try {
-      const randomSlug = await generateUniqueProjectSlug(supabase);
-      setSlug(randomSlug);
-    } catch (error) {
-      console.error("Error generating slug:", error);
-    } finally {
-      setIsGeneratingSlug(false);
-    }
-  };
-
-  const handleNameChange = (value: string) => {
-    setName(value);
-
-    if (slugMode !== "auto") return;
-
-    // Clear existing timeout
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-
-    // Auto-generate slug when name changes (with debounce)
-    if (value.trim()) {
-      debounceTimeoutRef.current = setTimeout(async () => {
-        try {
-          const autoSlug = await generateUniqueProjectSlug(supabase);
-          setSlug(autoSlug);
-        } catch (error) {
-          console.error("Error auto-generating slug:", error);
-        }
-      }, 500); // 500ms debounce
-    }
-  };
-
-  const handleSlugModeChange = (mode: "auto" | "custom") => {
-    setSlugMode(mode);
-    if (mode === "custom") {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-      setSlug("");
-    } else {
-      handleGenerateSlug();
-    }
-  };
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSubmitting) return; // Prevent duplicate submissions
-
-    if (!slug.trim()) {
-      toast.error(
-        slugMode === "auto"
-          ? "Please wait for the project slug to be generated before submitting."
-          : "Please enter a custom project slug."
-      );
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await onSubmit(name, description, slug);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <form
-      onSubmit={handleSubmit}
-      className="bg-white rounded-2xl shadow-2xl border border-slate-200/60 p-4 sm:p-6"
-    >
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-          <Plus className="w-5 h-5 text-white" />
-        </div>
-        <div>
-          <h3 className="text-lg sm:text-xl font-bold text-slate-900">
-            Create New Project
-          </h3>
-          <p className="text-xs text-slate-600">
-            Set up a new tracking campaign
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <div>
-          <label
-            htmlFor="name"
-            className="block text-sm font-bold text-slate-700 mb-1.5"
-          >
-            Project Name
-          </label>
-          <input
-            id="name"
-            type="text"
-            value={name}
-            onChange={(e) => handleNameChange(e.target.value)}
-            className="w-full px-3 py-3 text-base border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-            placeholder="e.g., Website Campaign, App Launch"
-            required
+      {showNewBrand && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+          <div
+            className="clickable-backdrop absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowNewBrand(false)}
           />
-        </div>
-
-        <div>
-          <span className="block text-sm font-bold text-slate-700 mb-1.5">
-            Project Slug
-          </span>
-          <div className="flex rounded-xl border-2 border-slate-300 p-0.5 mb-2">
-            <button
-              type="button"
-              onClick={() => handleSlugModeChange("auto")}
-              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                slugMode === "auto"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-slate-600 hover:bg-slate-100"
-              }`}
-            >
-              Auto-generate
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSlugModeChange("custom")}
-              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                slugMode === "custom"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-slate-600 hover:bg-slate-100"
-              }`}
-            >
-              Custom
-            </button>
-          </div>
-          <div className="flex space-x-2">
-            <input
-              id="slug"
-              type="text"
-              value={slug}
-              onChange={
-                slugMode === "custom"
-                  ? (e) => setSlug(e.target.value)
-                  : undefined
-              }
-              readOnly={slugMode === "auto"}
-              className={`flex-1 px-3 py-3 text-base border-2 border-slate-300 rounded-xl font-mono outline-none transition-all ${
-                slugMode === "auto"
-                  ? "bg-slate-50 text-slate-600 cursor-not-allowed"
-                  : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              }`}
-              placeholder={
-                slugMode === "auto"
-                  ? "Auto-generated letter"
-                  : "e.g., my-campaign, launch2026"
-              }
-              required
+          <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <NewBrandForm
+              onSubmit={handleCreateBrand}
+              onCancel={() => setShowNewBrand(false)}
             />
-            {slugMode === "auto" && (
-              <button
-                type="button"
-                onClick={handleGenerateSlug}
-                disabled={isGeneratingSlug}
-                className="px-4 py-2 text-sm bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap"
-              >
-                {isGeneratingSlug ? "..." : "New"}
-              </button>
-            )}
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            {slugMode === "auto" ? (
-              <>
-                Auto-generated when you type a project name (starts with single
-                letters like &quot;a&quot;, then &quot;a12&quot;, then
-                &quot;ab1&quot;, etc.). Click &quot;New&quot; if already taken.
-              </>
-            ) : (
-              <>
-                Enter any slug you want. It must be unique and is used in your
-                tracking URLs (e.g. /your-slug/...).
-              </>
-            )}
-          </p>
         </div>
-
-        <div>
-          <label
-            htmlFor="description"
-            className="block text-sm font-bold text-slate-700 mb-1.5"
-          >
-            Description{" "}
-            <span className="text-slate-400 font-normal">(Optional)</span>
-          </label>
-          <textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-3 py-3 text-base border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none transition-all"
-            rows={2}
-            placeholder="Brief description of this project"
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 mt-4">
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full sm:flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-2 text-sm rounded-xl transition-all duration-200 font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02]"
-        >
-          {isSubmitting ? "Creating..." : "Create Project"}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isSubmitting}
-          className="w-full sm:flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 text-sm rounded-xl transition-all font-semibold disabled:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 shadow-sm hover:shadow-md"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
+      )}
+    </div>
   );
 }

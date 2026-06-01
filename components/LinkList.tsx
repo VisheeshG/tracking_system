@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Link } from "@/lib/supabase";
+import { buildTrackingUrlTemplate } from "@/lib/tracking-url";
 import { Link2, Copy, Trash2, ExternalLink, AlertTriangle } from "lucide-react";
 
 interface LinkListProps {
@@ -9,6 +10,7 @@ interface LinkListProps {
   onSelectLink: (link: Link) => void;
   onDeleteLink: (linkId: string) => void;
   projectSlug: string;
+  brandSlug?: string | null;
   readOnly?: boolean;
   enableSelectInReadOnly?: boolean;
 }
@@ -18,6 +20,7 @@ export function LinkList({
   onSelectLink,
   onDeleteLink,
   projectSlug,
+  brandSlug = null,
   readOnly = false,
   enableSelectInReadOnly = false,
 }: LinkListProps) {
@@ -29,20 +32,25 @@ export function LinkList({
     linkTitle: string | null;
   }>({ show: false, linkId: null, linkTitle: null });
 
-  // Set base URL on component mount
+  const isCardClickable = !readOnly || enableSelectInReadOnly;
+
   useEffect(() => {
     setBaseUrl(window.location.origin);
   }, []);
 
-  const handleCopy = (
-    e: React.MouseEvent,
-    shortCode: string,
-    linkId: string
-  ) => {
+  const urlForLink = (link: Link) =>
+    buildTrackingUrlTemplate({
+      baseUrl,
+      brandSlug,
+      projectSlug,
+      shortCode: link.short_code,
+      includeSubmissionInUrl: link.include_submission_in_url ?? false,
+    });
+
+  const handleCopy = (e: React.MouseEvent, link: Link) => {
     e.stopPropagation();
-    const trackingUrl = `${baseUrl}/${projectSlug}/${shortCode}/[creator]/sub1`;
-    navigator.clipboard.writeText(trackingUrl);
-    setCopiedId(linkId);
+    navigator.clipboard.writeText(urlForLink(link));
+    setCopiedId(link.id);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -58,8 +66,8 @@ export function LinkList({
   const confirmDelete = () => {
     if (deleteConfirm.linkId) {
       onDeleteLink(deleteConfirm.linkId);
-      setDeleteConfirm({ show: false, linkId: null, linkTitle: null });
     }
+    setDeleteConfirm({ show: false, linkId: null, linkTitle: null });
   };
 
   const cancelDelete = () => {
@@ -72,111 +80,78 @@ export function LinkList({
         {links.map((link) => (
           <div
             key={link.id}
-            onClick={() => {
-              if (!readOnly || enableSelectInReadOnly) {
-                onSelectLink(link);
-              }
-            }}
-            className={`bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 hover:shadow-md hover:border-blue-300 transition group ${
-              readOnly && !enableSelectInReadOnly
-                ? "cursor-default"
-                : "cursor-pointer"
+            className={`relative bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-300 transition group ${
+              isCardClickable ? "clickable-card" : ""
             }`}
           >
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4 gap-4">
-              <div className="flex items-start space-x-3 sm:space-x-4 flex-1 min-w-0">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-50 rounded-lg flex items-center justify-center group-hover:bg-blue-100 transition flex-shrink-0">
-                  <Link2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-                </div>
+            {isCardClickable && (
+              <button
+                type="button"
+                onClick={() => onSelectLink(link)}
+                className="absolute inset-0 z-0 w-full h-full rounded-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                aria-label={`View analytics for ${link.link_title}`}
+              />
+            )}
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
-                    <h3 className="text-base sm:text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition break-words">
+            <div className="relative z-10 p-4 sm:p-6 pointer-events-none">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-50 rounded-lg flex items-center justify-center group-hover:bg-blue-100 transition flex-shrink-0">
+                    <Link2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base sm:text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition break-words text-left">
                       {link.link_title}
                     </h3>
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium self-start">
+                    <p className="text-xs sm:text-sm text-slate-500 mt-1">
                       {link.platform}
-                    </span>
-                    {link.open_app_on_mobile && (
-                      <span className="px-2 py-1 bg-violet-100 text-violet-700 text-xs rounded-full font-medium self-start">
-                        Opens in app on mobile
-                      </span>
+                    </p>
+                    {baseUrl && (
+                      <p className="text-xs text-slate-600 mt-2 font-mono break-all">
+                        {urlForLink(link)}
+                      </p>
                     )}
+                    <a
+                      href={link.destination_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className={`text-blue-600 hover:underline break-all block sm:inline sm:ml-2 mt-1 ${
+                        readOnly ? "pointer-events-auto" : "pointer-events-auto"
+                      }`}
+                    >
+                      {link.destination_url}
+                    </a>
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <div className="text-sm text-slate-600">
-                      <span className="font-medium block sm:inline">
-                        Destination:
-                      </span>
-                      <a
-                        href={link.destination_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-blue-600 hover:underline break-all block sm:inline sm:ml-2"
-                      >
-                        {link.destination_url}
-                      </a>
-                    </div>
-
-                    <div className="text-sm">
-                      <span className="font-medium text-slate-600 block sm:inline">
-                        Tracking URL:
-                      </span>
-                      <code className="text-xs sm:text-sm bg-slate-100 px-2 py-1 rounded font-mono text-slate-800 break-all block sm:inline sm:ml-2 mt-1 sm:mt-0">
-                        {baseUrl}/{projectSlug}/{link.short_code}/[creator]/sub1
-                      </code>
-                    </div>
-
-                    {/* {link.submission_number && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-medium text-slate-600">
-                          Submission:
-                        </span>
-                        <span className="text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded font-medium">
-                          {link.submission_number}
-                        </span>
-                      </div>
-                    )} */}
-                  </div>
+                <div className="flex items-center gap-1 pointer-events-auto shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => handleCopy(e, link)}
+                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                    title="Copy tracking URL"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={(e) =>
+                        handleDelete(e, link.id, link.link_title)
+                      }
+                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                      title="Delete link"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2 sm:ml-4 self-end sm:self-start">
-                <button
-                  onClick={(e) => handleCopy(e, link.short_code, link.id)}
-                  className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                  title="Copy tracking URL"
-                >
-                  {copiedId === link.id ? (
-                    <span className="text-xs text-green-600 font-medium whitespace-nowrap">
-                      Copied!
-                    </span>
-                  ) : (
-                    <Copy className="w-4 h-4" />
-                  )}
-                </button>
-
-                {!readOnly && (
-                  <button
-                    onClick={(e) => handleDelete(e, link.id, link.link_title)}
-                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                    title="Delete link"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="pt-3 sm:pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <span className="text-xs text-slate-500">
-                Created {new Date(link.created_at).toLocaleDateString()}
-              </span>
-              {!readOnly && (
-                <div className="flex items-center space-x-2 text-blue-600 text-sm font-medium sm:opacity-0 sm:group-hover:opacity-100 transition">
-                  <span>View Analytics</span>
+              {isCardClickable && (
+                <div className="mt-3 flex items-center space-x-2 text-blue-600 text-sm font-medium sm:opacity-0 sm:group-hover:opacity-100 transition pointer-events-none">
+                  <span>View analytics</span>
                   <ExternalLink className="w-4 h-4" />
                 </div>
               )}
@@ -185,27 +160,22 @@ export function LinkList({
         ))}
       </div>
 
-      {/* Delete Confirmation Modal */}
       {deleteConfirm.show && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black/50"
+            className="clickable-backdrop absolute inset-0 bg-black/50"
             onClick={cancelDelete}
           />
-          <div className="relative z-10 w-full max-w-md mx-4 bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+          <div className="relative z-10 bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-red-600" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-900">
-                Delete Link
-              </h3>
+              <h3 className="text-lg font-bold text-slate-900">Delete Link</h3>
             </div>
-            <p className="text-slate-600 mb-4">
-              Are you sure you want to delete{" "}
-              <span className="font-semibold">{deleteConfirm.linkTitle}</span>?
-              This will also delete all associated analytics data. This action
-              cannot be undone.
+            <p className="text-slate-600 mb-6">
+              Are you sure you want to delete &quot;{deleteConfirm.linkTitle}
+              &quot;? This will also delete all associated click data.
             </p>
             <div className="flex space-x-3">
               <button
@@ -222,6 +192,12 @@ export function LinkList({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {copiedId && (
+        <div className="fixed bottom-4 right-4 bg-slate-900 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50">
+          Tracking URL copied
         </div>
       )}
     </>
