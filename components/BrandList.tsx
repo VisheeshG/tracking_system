@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Brand } from "@/lib/supabase";
 import { Briefcase, Trash2, AlertTriangle, Link2, MousePointerClick } from "lucide-react";
+import { LastEditedLabel } from "./LastEditedLabel";
 
 export type BrandWithStats = Brand & {
   projectCount: number;
@@ -89,6 +90,12 @@ export function BrandList({
                   {brand.description}
                 </p>
               )}
+
+              <LastEditedLabel
+                updatedAt={brand.updated_at}
+                createdAt={brand.created_at}
+                className="mb-2"
+              />
 
               <div className="flex flex-wrap gap-3 pt-3 border-t border-slate-100 text-xs text-slate-600">
                 <span className="font-medium">

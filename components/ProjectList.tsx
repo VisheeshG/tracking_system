@@ -10,6 +10,7 @@ import {
   Link2,
   MousePointerClick,
 } from "lucide-react";
+import { LastEditedLabel } from "./LastEditedLabel";
 
 export type ProjectWithStats = Project & {
   linkCount: number;
@@ -150,6 +151,10 @@ export function ProjectList({
                     {project.slug}
                   </span>
                 </div>
+                <LastEditedLabel
+                  updatedAt={project.updated_at}
+                  createdAt={project.created_at}
+                />
               </div>
             </div>
           </div>

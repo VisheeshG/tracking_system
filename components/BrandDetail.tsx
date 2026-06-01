@@ -10,6 +10,9 @@ import { TitleSearchBar } from "./TitleSearchBar";
 import { NewProjectForm } from "./NewProjectForm";
 import { BrandAnalyticsPanel } from "./BrandAnalyticsPanel";
 import { matchesTitleQuery } from "@/lib/search";
+import { isValidSlug } from "@/lib/slug-utils";
+import { isBrandSlugUniqueForUser } from "@/lib/generators";
+import { LastEditedLabel } from "./LastEditedLabel";
 import {
   fetchStatsForProjectIds,
   fetchStatsMapForProjectIds,
@@ -33,8 +36,11 @@ export function BrandDetail({ brandId }: BrandDetailProps) {
   const [totalClicks, setTotalClicks] = useState(0);
   const [showNewProject, setShowNewProject] = useState(false);
   const [projectSearch, setProjectSearch] = useState("");
-  const [isEditingName, setIsEditingName] = useState(false);
+  const [isEditingBrand, setIsEditingBrand] = useState(false);
   const [editName, setEditName] = useState("");
+  const [editSlug, setEditSlug] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [isSavingBrand, setIsSavingBrand] = useState(false);
 
   const brandProjects = useMemo(
     () => projects.filter((p) => p.brand_id === brandId),
@@ -103,6 +109,8 @@ export function BrandDetail({ brandId }: BrandDetailProps) {
 
       setBrand(brandRes.data);
       setEditName(brandRes.data.name);
+      setEditSlug(brandRes.data.slug);
+      setEditDescription(brandRes.data.description ?? "");
       setBrands(brandsRes.data || []);
       const allProjects = (projectsRes.data || []).map((p) => ({
         ...p,
@@ -128,30 +136,73 @@ export function BrandDetail({ brandId }: BrandDetailProps) {
     loadData();
   }, [loadData]);
 
-  const handleSaveName = async () => {
+  const resetBrandEditFields = (b: Brand) => {
+    setEditName(b.name);
+    setEditSlug(b.slug);
+    setEditDescription(b.description ?? "");
+  };
+
+  const handleSaveBrand = async () => {
     if (!brand || !user) return;
-    const trimmed = editName.trim();
-    if (!trimmed) {
+    const trimmedName = editName.trim();
+    const trimmedSlug = editSlug.trim().toLowerCase();
+    const trimmedDescription = editDescription.trim();
+
+    if (!trimmedName) {
       toast.error("Brand name is required");
       return;
     }
 
+    if (!isValidSlug(trimmedSlug)) {
+      toast.error(
+        "Brand URL slug must be 2–48 characters: lowercase letters, numbers, and hyphens only."
+      );
+      return;
+    }
+
+    setIsSavingBrand(true);
     try {
+      if (trimmedSlug !== brand.slug) {
+        const unique = await isBrandSlugUniqueForUser(
+          trimmedSlug,
+          user.id,
+          supabase,
+          brand.id
+        );
+        if (!unique) {
+          toast.error(`Brand slug "${trimmedSlug}" is already in use.`);
+          return;
+        }
+      }
+
       const { data, error } = await supabase
         .from("brands")
-        .update({ name: trimmed })
+        .update({
+          name: trimmedName,
+          slug: trimmedSlug,
+          description: trimmedDescription || null,
+        })
         .eq("id", brand.id)
         .select()
         .single();
 
       if (error) throw error;
       setBrand(data);
-      setIsEditingName(false);
-      toast.success("Brand updated");
+      setBrands(brands.map((b) => (b.id === data.id ? data : b)));
+      setIsEditingBrand(false);
+      if (trimmedSlug !== brand.slug) {
+        toast.success(
+          "Brand updated. Old tracking URLs using the previous slug will stop working."
+        );
+      } else {
+        toast.success("Brand updated");
+      }
     } catch (error: unknown) {
       toast.error(
         error instanceof Error ? error.message : "Error updating brand"
       );
+    } finally {
+      setIsSavingBrand(false);
     }
   };
 
@@ -337,28 +388,75 @@ export function BrandDetail({ brandId }: BrandDetailProps) {
               <Briefcase className="w-6 h-6 text-violet-600" />
             </div>
             <div className="flex-1 min-w-0">
-              {isEditingName ? (
-                <div className="flex flex-wrap gap-2 items-center">
-                  <input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="text-2xl font-bold border-2 border-violet-300 rounded-lg px-2 py-1 max-w-full"
-                  />
-                  <button
-                    onClick={handleSaveName}
-                    className="px-3 py-1 bg-violet-600 text-white text-sm rounded-lg"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsEditingName(false);
-                      setEditName(brand.name);
-                    }}
-                    className="px-3 py-1 bg-slate-100 text-sm rounded-lg"
-                  >
-                    Cancel
-                  </button>
+              {isEditingBrand ? (
+                <div className="space-y-3 max-w-xl">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Brand name
+                    </label>
+                    <input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full text-lg font-bold border-2 border-violet-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Brand URL slug
+                    </label>
+                    <input
+                      value={editSlug}
+                      onChange={(e) =>
+                        setEditSlug(
+                          e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")
+                        )
+                      }
+                      className={`w-full font-mono border-2 rounded-lg px-3 py-2 ${
+                        editSlug && !isValidSlug(editSlug)
+                          ? "border-amber-400 bg-amber-50"
+                          : "border-violet-300"
+                      }`}
+                    />
+                    {editSlug !== brand.slug && (
+                      <p className="text-xs text-amber-700 mt-1 font-medium">
+                        Changing the slug breaks existing branded links that use{" "}
+                        <span className="font-mono">{brand.slug}</span>.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Description{" "}
+                      <span className="font-normal text-slate-400">(optional)</span>
+                    </label>
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      rows={2}
+                      className="w-full border-2 border-violet-300 rounded-lg px-3 py-2 text-sm resize-none"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveBrand}
+                      disabled={isSavingBrand}
+                      className="px-4 py-2 bg-violet-600 text-white text-sm rounded-lg font-semibold disabled:opacity-50"
+                    >
+                      {isSavingBrand ? "Saving…" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditingBrand(false);
+                        resetBrandEditFields(brand);
+                      }}
+                      disabled={isSavingBrand}
+                      className="px-4 py-2 bg-slate-100 text-sm rounded-lg font-semibold"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
@@ -366,19 +464,31 @@ export function BrandDetail({ brandId }: BrandDetailProps) {
                     {brand.name}
                   </h1>
                   <button
-                    onClick={() => setIsEditingName(true)}
-                    className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg"
-                    aria-label="Edit brand name"
+                    onClick={() => {
+                      resetBrandEditFields(brand);
+                      setIsEditingBrand(true);
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg cursor-pointer"
+                    aria-label="Edit brand"
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
                 </div>
               )}
-              <p className="text-sm text-slate-500 mt-1 font-mono">
-                linkto.in/{brand.slug}/…
-              </p>
-              {brand.description && (
-                <p className="text-slate-600 mt-1">{brand.description}</p>
+              {!isEditingBrand && (
+                <>
+                  <p className="text-sm text-slate-500 mt-1 font-mono">
+                    linkto.in/{brand.slug}/…
+                  </p>
+                  {brand.description && (
+                    <p className="text-slate-600 mt-1">{brand.description}</p>
+                  )}
+                  <LastEditedLabel
+                    updatedAt={brand.updated_at}
+                    createdAt={brand.created_at}
+                    className="mt-2"
+                  />
+                </>
               )}
             </div>
           </div>

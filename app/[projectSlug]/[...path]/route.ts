@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
   handleTrackingRedirect,
+  resolveLinkByBrandProjectAndShortCode,
   resolveLinkByProjectAndShortCode,
 } from "@/lib/tracking-redirect";
 
@@ -10,7 +11,11 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-/** Legacy URL: /{projectSlug}/{shortCode}/{creator}[/sub1] */
+/**
+ * Tracking redirects (single dynamic tree to satisfy Next.js segment naming):
+ * - Branded: /{brandSlug}/{projectSlug}/{shortCode}/{creator}[/sub1]
+ * - Legacy:  /{projectSlug}/{shortCode}/{creator}[/sub1]
+ */
 export async function GET(
   request: NextRequest,
   {
@@ -18,21 +23,43 @@ export async function GET(
   }: {
     params: Promise<{
       projectSlug: string;
-      shortCode: string;
-      params?: string[];
+      path: string[];
     }>;
   }
 ) {
   try {
-    const resolvedParams = await params;
-    const projectSlug = resolvedParams.projectSlug;
-    const shortCode = resolvedParams.shortCode;
-    const additionalParams = resolvedParams.params || [];
+    const { projectSlug: firstSegment, path } = await params;
+
+    if (path.length >= 3) {
+      const brandSlug = firstSegment;
+      const nestedProjectSlug = path[0];
+      const shortCode = path[1];
+      const additionalParams = path.slice(2);
+
+      const brandedLink = await resolveLinkByBrandProjectAndShortCode(
+        supabase,
+        brandSlug,
+        nestedProjectSlug,
+        shortCode
+      );
+
+      if (brandedLink) {
+        return handleTrackingRedirect(
+          request,
+          supabase,
+          brandedLink,
+          additionalParams
+        );
+      }
+    }
+
+    const shortCode = path[0];
+    const additionalParams = path.slice(1);
 
     const { data: projectData } = await supabase
       .from("projects")
       .select("id")
-      .eq("slug", projectSlug)
+      .eq("slug", firstSegment)
       .single();
 
     if (!projectData) {

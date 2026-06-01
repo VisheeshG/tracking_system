@@ -175,5 +175,7 @@ export default function ProjectPage() {
     );
   }
 
-  return <ProjectDetails project={project} />;
+  return (
+    <ProjectDetails project={project} onProjectUpdated={setProject} />
+  );
 }

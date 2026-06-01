@@ -9,8 +9,11 @@ import {
   TrendingUp,
   MousePointerClick,
   Shield,
+  Pencil,
 } from "lucide-react";
 import { LinkList } from "./LinkList";
+import { EditLinkModal, LinkEditPayload } from "./EditLinkModal";
+import { LastEditedLabel } from "./LastEditedLabel";
 import { TitleSearchBar } from "./TitleSearchBar";
 import { matchesTitleQuery } from "@/lib/search";
 import { Analytics } from "./Analytics";
@@ -27,9 +30,14 @@ import toast from "react-hot-toast";
 
 interface ProjectDetailsProps {
   project: Project;
+  onProjectUpdated?: (project: Project) => void;
 }
 
-function ProjectDetailsContent({ project }: ProjectDetailsProps) {
+function ProjectDetailsContent({
+  project: initialProject,
+  onProjectUpdated,
+}: ProjectDetailsProps) {
+  const [project, setProject] = useState(initialProject);
   const [links, setLinks] = useState<Link[]>([]);
   const [selectedLink, setSelectedLink] = useState<Link | null>(null);
   const [showNewLink, setShowNewLink] = useState(false);
@@ -43,6 +51,19 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
   const [linkSearch, setLinkSearch] = useState("");
   const [brandName, setBrandName] = useState<string | null>(null);
   const [brandSlug, setBrandSlug] = useState<string | null>(null);
+  const [isEditingProject, setIsEditingProject] = useState(false);
+  const [editProjectName, setEditProjectName] = useState(initialProject.name);
+  const [editProjectDescription, setEditProjectDescription] = useState(
+    initialProject.description ?? ""
+  );
+  const [isSavingProject, setIsSavingProject] = useState(false);
+  const [editingLink, setEditingLink] = useState<Link | null>(null);
+
+  useEffect(() => {
+    setProject(initialProject);
+    setEditProjectName(initialProject.name);
+    setEditProjectDescription(initialProject.description ?? "");
+  }, [initialProject]);
 
   useEffect(() => {
     if (!project.brand_id) {
@@ -159,6 +180,89 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
       };
     }
   }, [showNewLink, showPasswordManager]);
+
+  const handleSaveProject = async () => {
+    const trimmedName = editProjectName.trim();
+    const trimmedDescription = editProjectDescription.trim();
+
+    if (!trimmedName) {
+      toast.error("Project name is required");
+      return;
+    }
+
+    setIsSavingProject(true);
+    try {
+      const { data, error } = await supabase
+        .from("projects")
+        .update({
+          name: trimmedName,
+          description: trimmedDescription || null,
+        })
+        .eq("id", project.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setProject(data);
+      onProjectUpdated?.(data);
+      setIsEditingProject(false);
+      toast.success("Project updated");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Error updating project"
+      );
+    } finally {
+      setIsSavingProject(false);
+    }
+  };
+
+  const handleUpdateLink = async (
+    linkId: string,
+    payload: LinkEditPayload
+  ): Promise<boolean> => {
+    try {
+      const { data: existingUrl, error: urlCheckError } = await supabase
+        .from("links")
+        .select("id, link_title")
+        .eq("project_id", project.id)
+        .eq("destination_url", payload.destination_url)
+        .neq("id", linkId)
+        .maybeSingle();
+
+      if (urlCheckError && urlCheckError.code !== "PGRST116") {
+        throw urlCheckError;
+      }
+
+      if (existingUrl) {
+        toast.error(
+          `This destination URL already exists as "${existingUrl.link_title}".`
+        );
+        return false;
+      }
+
+      const { data, error } = await supabase
+        .from("links")
+        .update(payload)
+        .eq("id", linkId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setLinks(links.map((l) => (l.id === linkId ? data : l)));
+      if (selectedLink?.id === linkId) {
+        setSelectedLink(data);
+      }
+      toast.success("Link updated");
+      return true;
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Error updating link"
+      );
+      return false;
+    }
+  };
 
   const handleCreateLink = async (
     linkTitle: string,
@@ -331,13 +435,87 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
 
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-0">
             <div className="flex-1 min-w-0">
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 break-words mb-2">
-                {project.name}
-              </h1>
-              {project.description && (
-                <p className="text-sm sm:text-base text-slate-600 font-medium">
-                  {project.description}
-                </p>
+              {isEditingProject ? (
+                <div className="space-y-3 max-w-xl mb-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Project title
+                    </label>
+                    <input
+                      value={editProjectName}
+                      onChange={(e) => setEditProjectName(e.target.value)}
+                      className="w-full text-lg font-bold border-2 border-blue-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Description{" "}
+                      <span className="font-normal text-slate-400">
+                        (optional)
+                      </span>
+                    </label>
+                    <textarea
+                      value={editProjectDescription}
+                      onChange={(e) =>
+                        setEditProjectDescription(e.target.value)
+                      }
+                      rows={2}
+                      className="w-full border-2 border-blue-300 rounded-lg px-3 py-2 text-sm resize-none"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveProject}
+                      disabled={isSavingProject}
+                      className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg font-semibold disabled:opacity-50"
+                    >
+                      {isSavingProject ? "Saving…" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditingProject(false);
+                        setEditProjectName(project.name);
+                        setEditProjectDescription(project.description ?? "");
+                      }}
+                      disabled={isSavingProject}
+                      className="px-4 py-2 bg-slate-100 text-sm rounded-lg font-semibold"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-start gap-2 mb-2">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 break-words">
+                      {project.name}
+                    </h1>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditProjectName(project.name);
+                        setEditProjectDescription(project.description ?? "");
+                        setIsEditingProject(true);
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg shrink-0 cursor-pointer"
+                      aria-label="Edit project"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {project.description && (
+                    <p className="text-sm sm:text-base text-slate-600 font-medium">
+                      {project.description}
+                    </p>
+                  )}
+                  <LastEditedLabel
+                    updatedAt={project.updated_at}
+                    createdAt={project.created_at}
+                    className="mt-2"
+                  />
+                </>
               )}
             </div>
             <div className="flex items-center space-x-2 sm:space-x-3">
@@ -482,6 +660,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
                 links={filteredLinks}
                 onSelectLink={handleSelectLink}
                 onDeleteLink={handleDeleteLink}
+                onEditLink={setEditingLink}
                 projectSlug={project.slug}
                 brandSlug={brandSlug}
               />
@@ -516,6 +695,14 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
             />
           </div>
         </div>
+      )}
+
+      {editingLink && (
+        <EditLinkModal
+          link={editingLink}
+          onSave={handleUpdateLink}
+          onClose={() => setEditingLink(null)}
+        />
       )}
 
       {/* Password Management Modal */}
@@ -553,7 +740,10 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
   );
 }
 
-export function ProjectDetails({ project }: ProjectDetailsProps) {
+export function ProjectDetails({
+  project,
+  onProjectUpdated,
+}: ProjectDetailsProps) {
   return (
     <Suspense
       fallback={
@@ -562,7 +752,10 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
         </div>
       }
     >
-      <ProjectDetailsContent project={project} />
+      <ProjectDetailsContent
+        project={project}
+        onProjectUpdated={onProjectUpdated}
+      />
     </Suspense>
   );
 }

@@ -3,12 +3,21 @@
 import { useState, useEffect } from "react";
 import { Link } from "@/lib/supabase";
 import { buildTrackingUrlTemplate } from "@/lib/tracking-url";
-import { Link2, Copy, Trash2, ExternalLink, AlertTriangle } from "lucide-react";
+import {
+  Link2,
+  Copy,
+  Trash2,
+  ExternalLink,
+  AlertTriangle,
+  Pencil,
+} from "lucide-react";
+import { LastEditedLabel } from "./LastEditedLabel";
 
 interface LinkListProps {
   links: Link[];
   onSelectLink: (link: Link) => void;
   onDeleteLink: (linkId: string) => void;
+  onEditLink?: (link: Link) => void;
   projectSlug: string;
   brandSlug?: string | null;
   readOnly?: boolean;
@@ -19,6 +28,7 @@ export function LinkList({
   links,
   onSelectLink,
   onDeleteLink,
+  onEditLink,
   projectSlug,
   brandSlug = null,
   readOnly = false,
@@ -116,16 +126,32 @@ export function LinkList({
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className={`text-blue-600 hover:underline break-all block sm:inline sm:ml-2 mt-1 ${
-                        readOnly ? "pointer-events-auto" : "pointer-events-auto"
-                      }`}
+                      className="text-blue-600 hover:underline break-all block sm:inline sm:ml-2 mt-1 pointer-events-auto"
                     >
                       {link.destination_url}
                     </a>
+                    <LastEditedLabel
+                      updatedAt={link.updated_at}
+                      createdAt={link.created_at}
+                      className="mt-2"
+                    />
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1 pointer-events-auto shrink-0">
+                  {!readOnly && onEditLink && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditLink(link);
+                      }}
+                      className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition cursor-pointer"
+                      title="Edit link"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={(e) => handleCopy(e, link)}
