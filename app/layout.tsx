@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import "leaflet/dist/leaflet.css";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -19,6 +20,7 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
         <Toaster position="top-right" />
+        <Analytics />
       </body>
     </html>
   );
