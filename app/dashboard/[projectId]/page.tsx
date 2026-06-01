@@ -30,10 +30,10 @@ export default function ProjectPage() {
           if (publicProject?.slug) {
             router.replace(`/${publicProject.slug}`);
           } else {
-            router.replace("/");
+            router.replace("/login");
           }
         } catch {
-          router.replace("/");
+          router.replace("/login");
         }
       })();
     }

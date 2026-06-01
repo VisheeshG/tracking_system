@@ -17,8 +17,9 @@ import {
 } from "@/lib/project-stats";
 import { generateUniqueBrandSlug } from "@/lib/generators";
 import { isValidSlug, slugifyName } from "@/lib/slug-utils";
-import { LogOut, Plus, FolderOpen, Briefcase } from "lucide-react";
+import { LogOut, Plus, Briefcase } from "lucide-react";
 import toast from "react-hot-toast";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export function Dashboard() {
   const { user, signOut } = useAuth();
@@ -425,8 +426,8 @@ export function Dashboard() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4 animate-pulse shadow-lg">
-            <FolderOpen className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-900 rounded-2xl mb-4 animate-pulse shadow-lg p-2">
+            <BrandLogo size={48} />
           </div>
           <p className="text-slate-700 font-semibold text-lg">
             Loading dashboard...
@@ -452,14 +453,21 @@ export function Dashboard() {
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-5">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
             <div className="flex items-center space-x-3 sm:space-x-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                <FolderOpen className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-900 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg p-1.5 sm:p-2">
+                <BrandLogo
+                  size={48}
+                  priority
+                  className="w-8 h-8 sm:w-10 sm:h-10"
+                />
               </div>
               <div className="min-w-0">
-                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-                  Link Tracker
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-600 truncate max-w-[200px] sm:max-w-none font-medium">
+                <p className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                  Linkto
+                </p>
+                <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
+                  Branded links. Creator-level clarity.
+                </p>
+                <p className="text-xs sm:text-sm text-slate-600 truncate max-w-[200px] sm:max-w-none mt-0.5">
                   {user?.email}
                 </p>
               </div>

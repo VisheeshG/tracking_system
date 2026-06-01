@@ -1,42 +1,18 @@
-"use client";
+import type { Metadata } from "next";
+import { defaultTitle, siteConfig } from "@/lib/site-config";
+import { HomePageClient } from "@/components/landing/HomePageClient";
 
-import { useEffect, Suspense } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
-import { Auth } from "@/components/Auth";
+export const metadata: Metadata = {
+  title: defaultTitle,
+  description: siteConfig.description,
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "Linkto — Creator link tracking & analytics",
+    description: siteConfig.description,
+    url: "/",
+  },
+};
 
-function LoginPageContent() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (loading) return;
-    if (user) {
-      router.replace("/dashboard");
-    }
-  }, [loading, user, router]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-slate-600">Loading...</div>
-      </div>
-    );
-  }
-
-  return <Auth mode="signin" />;
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-          <div className="text-slate-600">Loading...</div>
-        </div>
-      }
-    >
-      <LoginPageContent />
-    </Suspense>
-  );
+export default function HomePage() {
+  return <HomePageClient />;
 }
