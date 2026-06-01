@@ -27,6 +27,7 @@ export default function PublicProjectPage() {
   const [totalClicks, setTotalClicks] = useState(0);
   const [platformCount, setPlatformCount] = useState(0);
   const [linkSearch, setLinkSearch] = useState("");
+  const [brandSlug, setBrandSlug] = useState<string | null>(null);
 
   const projectSlug = params.projectSlug as string;
 
@@ -57,6 +58,17 @@ export default function PublicProjectPage() {
         }
 
         setProject(projectData);
+
+        if (projectData.brand_id) {
+          const { data: brandData } = await supabase
+            .from("brands")
+            .select("slug")
+            .eq("id", projectData.brand_id)
+            .single();
+          setBrandSlug(brandData?.slug ?? null);
+        } else {
+          setBrandSlug(null);
+        }
 
         // Check if project requires password
         const response = await fetch(
@@ -275,6 +287,7 @@ export default function PublicProjectPage() {
       <Analytics
         link={selectedLink}
         projectSlug={project.slug}
+        brandSlug={brandSlug}
         onBack={() => {
           setSelectedLinkId(null);
           const url = new URL(window.location.href);
@@ -386,6 +399,7 @@ export default function PublicProjectPage() {
                 }}
                 onDeleteLink={() => {}}
                 projectSlug={project.slug}
+                brandSlug={brandSlug}
                 readOnly
                 enableSelectInReadOnly
               />

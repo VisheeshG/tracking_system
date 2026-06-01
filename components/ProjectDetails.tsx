@@ -42,10 +42,12 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
   const [formResetKey, setFormResetKey] = useState(0);
   const [linkSearch, setLinkSearch] = useState("");
   const [brandName, setBrandName] = useState<string | null>(null);
+  const [brandSlug, setBrandSlug] = useState<string | null>(null);
 
   useEffect(() => {
     if (!project.brand_id) {
       setBrandName(null);
+      setBrandSlug(null);
       return;
     }
 
@@ -53,10 +55,13 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
     (async () => {
       const { data } = await supabase
         .from("brands")
-        .select("name")
+        .select("name, slug")
         .eq("id", project.brand_id)
         .single();
-      if (!cancelled) setBrandName(data?.name ?? null);
+      if (!cancelled) {
+        setBrandName(data?.name ?? null);
+        setBrandSlug(data?.slug ?? null);
+      }
     })();
 
     return () => {
@@ -160,7 +165,8 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
     platform: string,
     destinationUrl: string,
     shortCode: string,
-    openAppOnMobile: boolean
+    openAppOnMobile: boolean,
+    includeSubmissionInUrl: boolean
   ) => {
     try {
       // Check if destination URL already exists in this project
@@ -212,6 +218,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
           short_code: finalShortCode,
           submission_number: submissionNumber,
           open_app_on_mobile: openAppOnMobile,
+          include_submission_in_url: includeSubmissionInUrl,
         })
         .select()
         .single();
@@ -287,6 +294,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
           router.replace(qs ? `?${qs}` : `/dashboard/${project.id}`);
         }}
         projectSlug={project.slug}
+        brandSlug={brandSlug}
       />
     );
   }
@@ -475,6 +483,7 @@ function ProjectDetailsContent({ project }: ProjectDetailsProps) {
                 onSelectLink={handleSelectLink}
                 onDeleteLink={handleDeleteLink}
                 projectSlug={project.slug}
+                brandSlug={brandSlug}
               />
             )}
           </>
@@ -567,7 +576,8 @@ function NewLinkForm({
     platform: string,
     destinationUrl: string,
     shortCode: string,
-    openAppOnMobile: boolean
+    openAppOnMobile: boolean,
+    includeSubmissionInUrl: boolean
   ) => Promise<boolean>;
   onCancel: () => void;
 }) {
@@ -576,6 +586,7 @@ function NewLinkForm({
   const [destinationUrl, setDestinationUrl] = useState("");
   const [shortCode, setShortCode] = useState("");
   const [openAppOnMobile, setOpenAppOnMobile] = useState(false);
+  const [includeSubmissionInUrl, setIncludeSubmissionInUrl] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -636,7 +647,8 @@ function NewLinkForm({
         platform,
         destinationUrl,
         shortCode,
-        openAppOnMobile
+        openAppOnMobile,
+        includeSubmissionInUrl
       );
     } finally {
       setIsSubmitting(false);
@@ -721,7 +733,27 @@ function NewLinkForm({
           />
         </div>
 
-        <div className="rounded-xl border-2 border-slate-200 p-3">
+        <div className="rounded-xl border-2 border-slate-200 p-3 space-y-3">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={includeSubmissionInUrl}
+              onChange={(e) => setIncludeSubmissionInUrl(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>
+              <span className="block text-sm font-bold text-slate-700">
+                Include submission in tracking URL
+              </span>
+              <span className="block text-xs text-slate-500 mt-0.5">
+                When enabled, links end with{" "}
+                <span className="font-mono">/sub1</span> (e.g. for multiple
+                posts). When off, URLs end with the creator name only — cleaner
+                for bios.
+              </span>
+            </span>
+          </label>
+
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
   handleTrackingRedirect,
-  resolveLinkByProjectAndShortCode,
+  resolveLinkByBrandProjectAndShortCode,
 } from "@/lib/tracking-redirect";
 
 const supabase = createClient(
@@ -10,13 +10,14 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-/** Legacy URL: /{projectSlug}/{shortCode}/{creator}[/sub1] */
+/** Brand URL: /{brandSlug}/{projectSlug}/{shortCode}/{creator}[/sub1] */
 export async function GET(
   request: NextRequest,
   {
     params,
   }: {
     params: Promise<{
+      brandSlug: string;
       projectSlug: string;
       shortCode: string;
       params?: string[];
@@ -25,23 +26,13 @@ export async function GET(
 ) {
   try {
     const resolvedParams = await params;
-    const projectSlug = resolvedParams.projectSlug;
-    const shortCode = resolvedParams.shortCode;
+    const { brandSlug, projectSlug, shortCode } = resolvedParams;
     const additionalParams = resolvedParams.params || [];
 
-    const { data: projectData } = await supabase
-      .from("projects")
-      .select("id")
-      .eq("slug", projectSlug)
-      .single();
-
-    if (!projectData) {
-      return NextResponse.redirect("about:blank", 307);
-    }
-
-    const linkData = await resolveLinkByProjectAndShortCode(
+    const linkData = await resolveLinkByBrandProjectAndShortCode(
       supabase,
-      projectData.id,
+      brandSlug,
+      projectSlug,
       shortCode
     );
 
@@ -56,7 +47,7 @@ export async function GET(
       additionalParams
     );
   } catch (error) {
-    console.error("Redirect error:", error);
+    console.error("Brand redirect error:", error);
     return NextResponse.redirect("about:blank", 307);
   }
 }

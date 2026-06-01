@@ -15,6 +15,8 @@ import {
   fetchStatsForProjectIds,
   fetchStatsMapForProjectIds,
 } from "@/lib/project-stats";
+import { generateUniqueBrandSlug } from "@/lib/generators";
+import { isValidSlug, slugifyName } from "@/lib/slug-utils";
 import { LogOut, Plus, FolderOpen, Briefcase } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -173,13 +175,25 @@ export function Dashboard() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showNewProject, showNewBrand]);
 
-  const handleCreateBrand = async (name: string, description: string) => {
+  const handleCreateBrand = async (
+    name: string,
+    description: string,
+    slugInput: string
+  ) => {
     if (!user) return false;
 
     try {
       const trimmedName = name.trim();
       if (!trimmedName) {
         toast.error("Brand name is required");
+        return false;
+      }
+
+      const trimmedSlug = (slugInput.trim() || slugifyName(trimmedName)).toLowerCase();
+      if (!isValidSlug(trimmedSlug)) {
+        toast.error(
+          "Brand URL slug must be 2–48 characters: lowercase letters, numbers, and hyphens only."
+        );
         return false;
       }
 
@@ -195,11 +209,28 @@ export function Dashboard() {
         return false;
       }
 
+      const slugUnique = await generateUniqueBrandSlug(trimmedName, user.id, supabase);
+      const finalSlug =
+        trimmedSlug === slugifyName(trimmedName) ? slugUnique : trimmedSlug;
+
+      const { data: slugTaken } = await supabase
+        .from("brands")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("slug", finalSlug)
+        .maybeSingle();
+
+      if (slugTaken) {
+        toast.error(`Brand slug "${finalSlug}" is already in use.`);
+        return false;
+      }
+
       const { data, error } = await supabase
         .from("brands")
         .insert({
           user_id: user.id,
           name: trimmedName,
+          slug: finalSlug,
           description: description.trim() || null,
         })
         .select()

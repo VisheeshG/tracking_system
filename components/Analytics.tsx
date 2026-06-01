@@ -23,6 +23,10 @@ import { ClicksAnalyticsChart } from "./ClicksAnalyticsChart";
 import { GeoInsightsPanelClient } from "./GeoInsightsPanelLazy";
 import { AnalyticsDateRangePicker } from "./AnalyticsDateRangePicker";
 import { filterClicksInDateRange } from "@/lib/click-aggregation";
+import {
+  buildTrackingUrlExample,
+  buildTrackingUrlTemplate,
+} from "@/lib/tracking-url";
 import { formatDateRangeLabel } from "@/lib/analytics-date-range";
 import {
   ANALYTICS_DATE_RANGE_STORAGE_KEYS,
@@ -371,6 +375,7 @@ interface AnalyticsProps {
   link: Link;
   onBack: () => void;
   projectSlug: string;
+  brandSlug?: string | null;
 }
 
 interface AnalyticsData {
@@ -389,7 +394,12 @@ interface AnalyticsData {
 
 type AnalyticsViewMode = "map" | "detailed";
 
-export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
+export function Analytics({
+  link,
+  onBack,
+  projectSlug,
+  brandSlug = null,
+}: AnalyticsProps) {
   const [allClicks, setAllClicks] = useState<LinkClick[]>([]);
   const [clickFilters, setClickFilters] =
     useState<ClickFilters>(DEFAULT_CLICK_FILTERS);
@@ -970,9 +980,27 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
     }
   };
 
-  const baseUrl = window.location.origin;
-  const trackingUrl = `${baseUrl}/${projectSlug}/${link.short_code}`;
-  const exampleUrl = `${trackingUrl}/johndoe/sub1`;
+  const includeSub = link.include_submission_in_url ?? false;
+  const trackingUrlTemplate =
+    typeof window !== "undefined"
+      ? buildTrackingUrlTemplate({
+          baseUrl: window.location.origin,
+          brandSlug,
+          projectSlug,
+          shortCode: link.short_code,
+          includeSubmissionInUrl: includeSub,
+        })
+      : "";
+  const exampleUrl =
+    typeof window !== "undefined"
+      ? buildTrackingUrlExample({
+          baseUrl: window.location.origin,
+          brandSlug,
+          projectSlug,
+          shortCode: link.short_code,
+          includeSubmissionInUrl: includeSub,
+        })
+      : "";
 
   if (loading) {
     return (
@@ -1137,7 +1165,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
             <div>
               <p className="text-xs text-slate-600 mb-2 font-medium">Format:</p>
               <code className="block bg-white px-3 sm:px-4 py-3 rounded-xl font-mono text-xs sm:text-sm text-slate-800 overflow-x-auto shadow-sm border border-slate-200">
-                {trackingUrl}/[creator]/sub1
+                {trackingUrlTemplate}
               </code>
             </div>
             <div>

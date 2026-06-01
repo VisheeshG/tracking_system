@@ -36,16 +36,19 @@ import {
   ChevronRight,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { buildTrackingUrlTemplate } from "@/lib/tracking-url";
 
 interface BrandAnalyticsPanelProps {
   projectIds: string[];
   projects?: Pick<Project, "id" | "slug" | "name">[];
+  brandSlug?: string | null;
 }
 
 const PREVIEW_LIMIT = 5;
 
 type LinkClickRow = {
   link: Link;
+  brandSlug: string | null;
   projectSlug: string;
   projectName: string;
   clickCount: number;
@@ -232,9 +235,17 @@ function LinkTitlesDetailModal({
     );
   }, [rows, search]);
 
+  const trackingTemplateFor = (row: LinkClickRow) =>
+    buildTrackingUrlTemplate({
+      baseUrl: origin,
+      brandSlug: row.brandSlug,
+      projectSlug: row.projectSlug,
+      shortCode: row.link.short_code,
+      includeSubmissionInUrl: row.link.include_submission_in_url ?? false,
+    });
+
   const copyTrackingUrl = (row: LinkClickRow) => {
-    const url = `${origin}/${row.projectSlug}/${row.link.short_code}/[creator]/sub1`;
-    navigator.clipboard.writeText(url);
+    navigator.clipboard.writeText(trackingTemplateFor(row));
     setCopiedId(row.link.id);
     toast.success("Tracking URL copied");
     setTimeout(() => setCopiedId(null), 2000);
@@ -299,7 +310,10 @@ function LinkTitlesDetailModal({
                   totalClicks > 0
                     ? ((row.clickCount / totalClicks) * 100).toFixed(1)
                     : "0";
-                const trackingPath = `/${row.projectSlug}/${row.link.short_code}/[creator]/sub1`;
+                const trackingPath = trackingTemplateFor(row).replace(
+                  origin,
+                  ""
+                );
 
                 return (
                   <li
@@ -634,6 +648,7 @@ function LinkTitlesSummaryCard({
 export function BrandAnalyticsPanel({
   projectIds,
   projects = [],
+  brandSlug = null,
 }: BrandAnalyticsPanelProps) {
   const [links, setLinks] = useState<Link[]>([]);
   const [clicks, setClicks] = useState<LinkClick[]>([]);
@@ -716,6 +731,7 @@ export function BrandAnalyticsPanel({
         const project = projectById.get(link.project_id);
         return {
           link,
+          brandSlug,
           projectSlug: project?.slug ?? "",
           projectName: project?.name ?? "Unknown project",
           clickCount: countByLinkId.get(link.id) ?? 0,
@@ -723,7 +739,7 @@ export function BrandAnalyticsPanel({
       })
       .filter((row) => row.clickCount > 0)
       .sort((a, b) => b.clickCount - a.clickCount);
-  }, [clicks, links, startDate, endDate, projectById]);
+  }, [clicks, links, startDate, endDate, projectById, brandSlug]);
 
   const breakdowns = useMemo(
     () => ({

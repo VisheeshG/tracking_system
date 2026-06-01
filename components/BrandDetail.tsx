@@ -374,6 +374,9 @@ export function BrandDetail({ brandId }: BrandDetailProps) {
                   </button>
                 </div>
               )}
+              <p className="text-sm text-slate-500 mt-1 font-mono">
+                linkto.in/{brand.slug}/…
+              </p>
               {brand.description && (
                 <p className="text-slate-600 mt-1">{brand.description}</p>
               )}
@@ -437,6 +440,7 @@ export function BrandDetail({ brandId }: BrandDetailProps) {
         <BrandAnalyticsPanel
           projectIds={brandProjects.map((p) => p.id)}
           projects={brandProjects}
+          brandSlug={brand.slug}
         />
       </main>
 
