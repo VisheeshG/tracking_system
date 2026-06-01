@@ -3,6 +3,7 @@
  */
 
 import { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAllPages } from "@/lib/supabase-pagination";
 
 /**
  * Generate a random project slug with configurable format
@@ -137,14 +138,14 @@ export async function generateUniqueProjectSlug(
   for (const [letterCount, numberCount] of formats) {
     // For single letters, try to find an available one directly
     if (letterCount === 1 && numberCount === 0) {
-      const { data: allProjects } = await supabase
-        .from("projects")
-        .select("slug");
+      const allProjects = await fetchAllPages(async (from, to) =>
+        supabase.from("projects").select("slug").range(from, to)
+      );
 
       const takenLetters = new Set(
         allProjects
-          ?.map((p) => p.slug)
-          .filter((slug) => slug.length === 1 && /^[a-z]$/.test(slug)) || []
+          .map((p) => p.slug)
+          .filter((slug) => slug.length === 1 && /^[a-z]$/.test(slug))
       );
 
       const letters = "abcdefghijklmnopqrstuvwxyz".split("");

@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, PostgrestError } from "@supabase/supabase-js";
+import {
+  deleteAllArchivedClicksForLinkIds,
+  deleteAllClicksForLinkIds,
+  fetchAllLinkIdsForProjectId,
+} from "@/lib/supabase-pagination";
 
 function isMissingTableError(error: PostgrestError | null): boolean {
   if (!error) return false;
@@ -70,40 +75,53 @@ export async function DELETE(
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
 
-    const { data: links, error: linksError } = await admin
-      .from("links")
-      .select("id")
-      .eq("project_id", projectId);
-
-    if (linksError) {
+    let linkIds: string[] = [];
+    try {
+      linkIds = await fetchAllLinkIdsForProjectId(admin, projectId);
+    } catch (linksError) {
       console.error("Error fetching links:", linksError);
-      return NextResponse.json({ error: linksError.message }, { status: 500 });
+      return NextResponse.json(
+        {
+          error:
+            linksError instanceof Error
+              ? linksError.message
+              : "Error fetching links",
+        },
+        { status: 500 }
+      );
     }
 
-    const linkIds = (links ?? []).map((l) => l.id);
-
     if (linkIds.length > 0) {
-      const { error: clicksError } = await admin
-        .from("link_clicks")
-        .delete()
-        .in("link_id", linkIds);
-
-      if (clicksError) {
+      try {
+        await deleteAllClicksForLinkIds(admin, linkIds);
+      } catch (clicksError) {
         console.error("Error deleting link_clicks:", clicksError);
-        return NextResponse.json({ error: clicksError.message }, { status: 500 });
-      }
-
-      const { error: archiveError } = await admin
-        .from("link_clicks_archive")
-        .delete()
-        .in("link_id", linkIds);
-
-      if (archiveError && !isMissingTableError(archiveError)) {
-        console.error("Error deleting link_clicks_archive:", archiveError);
         return NextResponse.json(
-          { error: archiveError.message },
+          {
+            error:
+              clicksError instanceof Error
+                ? clicksError.message
+                : "Error deleting link_clicks",
+          },
           { status: 500 }
         );
+      }
+
+      try {
+        await deleteAllArchivedClicksForLinkIds(admin, linkIds);
+      } catch (archiveError) {
+        if (!isMissingTableError(archiveError as PostgrestError)) {
+          console.error("Error deleting link_clicks_archive:", archiveError);
+          return NextResponse.json(
+            {
+              error:
+                archiveError instanceof Error
+                  ? archiveError.message
+                  : "Error deleting link_clicks_archive",
+            },
+            { status: 500 }
+          );
+        }
       }
 
       const { error: deleteLinksError } = await admin

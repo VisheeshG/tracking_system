@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link, LinkClick, supabase } from "@/lib/supabase";
+import { fetchAllClicksForLinkId } from "@/lib/supabase-pagination";
 import {
   ArrowLeft,
   ArrowDown,
@@ -19,7 +20,14 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { ClicksAnalyticsChart } from "./ClicksAnalyticsChart";
-import { GeoInsightsPanel } from "./GeoInsightsPanel";
+import { GeoInsightsPanelClient } from "./GeoInsightsPanelLazy";
+import { AnalyticsDateRangePicker } from "./AnalyticsDateRangePicker";
+import { filterClicksInDateRange } from "@/lib/click-aggregation";
+import { formatDateRangeLabel } from "@/lib/analytics-date-range";
+import {
+  ANALYTICS_DATE_RANGE_STORAGE_KEYS,
+  useAnalyticsDateRange,
+} from "@/hooks/useAnalyticsDateRange";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -161,9 +169,7 @@ function computeAnalyticsFromClicks(
 
     if (click.clicked_at) {
       const dateString = getDateString(new Date(click.clicked_at));
-      if (dateString >= startDate && dateString <= endDate) {
-        dailyClicksMap[dateString] = (dailyClicksMap[dateString] || 0) + 1;
-      }
+      dailyClicksMap[dateString] = (dailyClicksMap[dateString] || 0) + 1;
     }
   });
 
@@ -391,22 +397,15 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
     useState<ClickFilters>(DEFAULT_CLICK_FILTERS);
   const [loading, setLoading] = useState(true);
   const [selectedCreator, setSelectedCreator] = useState<string | null>(null);
-  const [startDate, setStartDate] = useState<string>(() => {
-    // Initialize with Monday of current week
-    const today = new Date();
-    const day = today.getDay();
-    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(today.setDate(diff));
-    return monday.toISOString().split("T")[0];
-  });
-  const [endDate, setEndDate] = useState<string>(() => {
-    // Initialize with Sunday of current week
-    const today = new Date();
-    const day = today.getDay();
-    const diff = today.getDate() - day + (day === 0 ? 0 : 7);
-    const sunday = new Date(today.setDate(diff));
-    return sunday.toISOString().split("T")[0];
-  });
+  const {
+    rangePreset,
+    startDate,
+    endDate,
+    allTimeRange,
+    applyPreset,
+    handleStartDateChange,
+    handleEndDateChange,
+  } = useAnalyticsDateRange(ANALYTICS_DATE_RANGE_STORAGE_KEYS.project, allClicks);
   const [creatorAnalytics, setCreatorAnalytics] = useState<{
     clicks: LinkClick[];
     totalClicks: number;
@@ -429,14 +428,8 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
 
   const loadAnalytics = useCallback(async () => {
     try {
-      const { data: clicks, error } = await supabase
-        .from("link_clicks")
-        .select("*")
-        .eq("link_id", link.id)
-        .order("clicked_at", { ascending: false });
-
-      if (error) throw error;
-      setAllClicks(clicks || []);
+      const clicks = await fetchAllClicksForLinkId(supabase, link.id);
+      setAllClicks(clicks);
     } catch (error) {
       console.error("Error loading analytics:", error);
     } finally {
@@ -472,15 +465,25 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
     [allClicks, clickFilters]
   );
 
+  const dateFilteredClicks = useMemo(
+    () => filterClicksInDateRange(filteredClicks, startDate, endDate),
+    [filteredClicks, startDate, endDate]
+  );
+
   const data = useMemo(
     () =>
       computeAnalyticsFromClicks(
-        filteredClicks,
+        dateFilteredClicks,
         link,
         startDate,
         endDate
       ),
-    [filteredClicks, link, startDate, endDate]
+    [dateFilteredClicks, link, startDate, endDate]
+  );
+
+  const dateRangeLabel = useMemo(
+    () => formatDateRangeLabel(startDate, endDate),
+    [startDate, endDate]
   );
 
   const exportRows = useMemo(
@@ -897,19 +900,16 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
 
   const loadCreatorAnalytics = async (creatorUsername: string) => {
     try {
-      const { data: clicks, error } = await supabase
-        .from("link_clicks")
-        .select("*")
-        .eq("link_id", link.id)
-        .eq("creator_username", creatorUsername)
-        .order("clicked_at", { ascending: false });
-
-      if (error) throw error;
+      const clicks = await fetchAllClicksForLinkId(supabase, link.id, {
+        creatorUsername,
+      });
 
       // Get all unique submissions
       const allSubmissions = Array.from(
         new Set(
-          clicks?.map((click) => click.submission_number).filter(Boolean) || []
+          clicks
+            .map((click) => click.submission_number)
+            .filter((s): s is string => Boolean(s))
         )
       ).sort((a, b) => {
         const aIsNumeric = !isNaN(Number(a));
@@ -924,8 +924,8 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
       });
 
       const analytics = {
-        clicks: clicks || [],
-        totalClicks: clicks?.length || 0,
+        clicks,
+        totalClicks: clicks.length,
         clicksBySubmission: {} as Record<string, number>,
         clicksByCountry: {} as Record<string, number>,
         clicksByState: {} as Record<string, number>,
@@ -935,7 +935,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
         allSubmissions,
       };
 
-      clicks?.forEach((click) => {
+      clicks.forEach((click) => {
         if (click.submission_number) {
           analytics.clicksBySubmission[click.submission_number] =
             (analytics.clicksBySubmission[click.submission_number] || 0) + 1;
@@ -1163,31 +1163,35 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
           onViewModeChange={setAnalyticsViewMode}
         />
 
+        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-4 sm:p-5 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+            <p className="text-sm text-slate-600">
+              <span className="font-semibold text-slate-800">{dateRangeLabel}</span>
+              {" · "}
+              {data.totalClicks.toLocaleString()} clicks in range
+            </p>
+          </div>
+          <AnalyticsDateRangePicker
+            preset={rangePreset}
+            startDate={startDate}
+            endDate={endDate}
+            onPresetChange={applyPreset}
+            onStartDateChange={handleStartDateChange}
+            onEndDateChange={handleEndDateChange}
+            minDate={allTimeRange.startDate}
+            maxDate={allTimeRange.endDate}
+          />
+        </div>
+
         {analyticsViewMode === "map" ? (
-          <GeoInsightsPanel clicks={filteredClicks} />
+          <GeoInsightsPanelClient clicks={dateFilteredClicks} />
         ) : (
           <>
-            {/* Clicks Bar Chart */}
             <ClicksAnalyticsChart
               weeklyData={data.clicksByWeek}
               startDate={startDate}
               endDate={endDate}
-              onStartDateChange={setStartDate}
-              onEndDateChange={setEndDate}
-              onCurrentWeekClick={() => {
-                const today = new Date();
-                const day = today.getDay();
-                const mondayDiff = today.getDate() - day + (day === 0 ? -6 : 1);
-                const sundayDiff = today.getDate() - day + (day === 0 ? 0 : 7);
-
-                const monday = new Date(today);
-                monday.setDate(mondayDiff);
-                const sunday = new Date(today);
-                sunday.setDate(sundayDiff);
-
-                setStartDate(monday.toISOString().split("T")[0]);
-                setEndDate(sunday.toISOString().split("T")[0]);
-              }}
+              totalClicksInRange={data.totalClicks}
             />
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -1403,7 +1407,7 @@ export function Analytics({ link, onBack, projectSlug }: AnalyticsProps) {
       {selectedCreator && creatorAnalytics && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="clickable-backdrop absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => {
               setSelectedCreator(null);
               setCreatorAnalytics(null);

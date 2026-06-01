@@ -29,7 +29,8 @@ export function LinkList({
     linkTitle: string | null;
   }>({ show: false, linkId: null, linkTitle: null });
 
-  // Set base URL on component mount
+  const isCardClickable = !readOnly || enableSelectInReadOnly;
+
   useEffect(() => {
     setBaseUrl(window.location.origin);
   }, []);
@@ -72,124 +73,132 @@ export function LinkList({
         {links.map((link) => (
           <div
             key={link.id}
-            onClick={() => {
-              if (!readOnly || enableSelectInReadOnly) {
-                onSelectLink(link);
-              }
-            }}
-            className={`bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 hover:shadow-md hover:border-blue-300 transition group ${
-              readOnly && !enableSelectInReadOnly
-                ? "cursor-default"
-                : "cursor-pointer"
+            className={`relative bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-300 transition group ${
+              isCardClickable ? "clickable-card" : ""
             }`}
           >
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4 gap-4">
-              <div className="flex items-start space-x-3 sm:space-x-4 flex-1 min-w-0">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-50 rounded-lg flex items-center justify-center group-hover:bg-blue-100 transition flex-shrink-0">
-                  <Link2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+            {isCardClickable && (
+              <button
+                type="button"
+                onClick={() => onSelectLink(link)}
+                className="absolute inset-0 z-0 w-full h-full rounded-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                aria-label={`View analytics for ${link.link_title}`}
+              />
+            )}
+
+            <div
+              className={`relative z-10 p-4 sm:p-6 ${
+                isCardClickable ? "pointer-events-none" : ""
+              }`}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4 gap-4">
+                <div className="flex items-start space-x-3 sm:space-x-4 flex-1 min-w-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-50 rounded-lg flex items-center justify-center group-hover:bg-blue-100 transition flex-shrink-0">
+                    <Link2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                      <h3 className="text-base sm:text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition break-words text-left">
+                        {link.link_title}
+                      </h3>
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium self-start">
+                        {link.platform}
+                      </span>
+                      {link.open_app_on_mobile && (
+                        <span className="px-2 py-1 bg-violet-100 text-violet-700 text-xs rounded-full font-medium self-start">
+                          Opens in app on mobile
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm text-slate-600 text-left">
+                        <span className="font-medium block sm:inline">
+                          Destination:
+                        </span>
+                        <a
+                          href={link.destination_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className={`text-blue-600 hover:underline break-all block sm:inline sm:ml-2 ${
+                            isCardClickable
+                              ? "relative z-20 pointer-events-auto"
+                              : ""
+                          }`}
+                        >
+                          {link.destination_url}
+                        </a>
+                      </div>
+
+                      <div className="text-sm text-left">
+                        <span className="font-medium text-slate-600 block sm:inline">
+                          Tracking URL:
+                        </span>
+                        <code className="text-xs sm:text-sm bg-slate-100 px-2 py-1 rounded font-mono text-slate-800 break-all block sm:inline sm:ml-2 mt-1 sm:mt-0">
+                          {baseUrl}/{projectSlug}/{link.short_code}/[creator]/sub1
+                        </code>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
-                    <h3 className="text-base sm:text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition break-words">
-                      {link.link_title}
-                    </h3>
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium self-start">
-                      {link.platform}
-                    </span>
-                    {link.open_app_on_mobile && (
-                      <span className="px-2 py-1 bg-violet-100 text-violet-700 text-xs rounded-full font-medium self-start">
-                        Opens in app on mobile
+                <div
+                  className={`flex items-center space-x-2 sm:ml-4 self-end sm:self-start ${
+                    isCardClickable ? "relative z-20 pointer-events-auto" : ""
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={(e) => handleCopy(e, link.short_code, link.id)}
+                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                    title="Copy tracking URL"
+                  >
+                    {copiedId === link.id ? (
+                      <span className="text-xs text-green-600 font-medium whitespace-nowrap">
+                        Copied!
                       </span>
+                    ) : (
+                      <Copy className="w-4 h-4" />
                     )}
-                  </div>
+                  </button>
 
-                  <div className="space-y-2">
-                    <div className="text-sm text-slate-600">
-                      <span className="font-medium block sm:inline">
-                        Destination:
-                      </span>
-                      <a
-                        href={link.destination_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-blue-600 hover:underline break-all block sm:inline sm:ml-2"
-                      >
-                        {link.destination_url}
-                      </a>
-                    </div>
-
-                    <div className="text-sm">
-                      <span className="font-medium text-slate-600 block sm:inline">
-                        Tracking URL:
-                      </span>
-                      <code className="text-xs sm:text-sm bg-slate-100 px-2 py-1 rounded font-mono text-slate-800 break-all block sm:inline sm:ml-2 mt-1 sm:mt-0">
-                        {baseUrl}/{projectSlug}/{link.short_code}/[creator]/sub1
-                      </code>
-                    </div>
-
-                    {/* {link.submission_number && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-medium text-slate-600">
-                          Submission:
-                        </span>
-                        <span className="text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded font-medium">
-                          {link.submission_number}
-                        </span>
-                      </div>
-                    )} */}
-                  </div>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={(e) =>
+                        handleDelete(e, link.id, link.link_title)
+                      }
+                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                      title="Delete link"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2 sm:ml-4 self-end sm:self-start">
-                <button
-                  onClick={(e) => handleCopy(e, link.short_code, link.id)}
-                  className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                  title="Copy tracking URL"
-                >
-                  {copiedId === link.id ? (
-                    <span className="text-xs text-green-600 font-medium whitespace-nowrap">
-                      Copied!
-                    </span>
-                  ) : (
-                    <Copy className="w-4 h-4" />
-                  )}
-                </button>
-
-                {!readOnly && (
-                  <button
-                    onClick={(e) => handleDelete(e, link.id, link.link_title)}
-                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                    title="Delete link"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+              <div className="pt-3 sm:pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <span className="text-xs text-slate-500 text-left">
+                  Created {new Date(link.created_at).toLocaleDateString()}
+                </span>
+                {!readOnly && isCardClickable && (
+                  <div className="flex items-center space-x-2 text-blue-600 text-sm font-medium sm:opacity-0 sm:group-hover:opacity-100 transition">
+                    <span>View Analytics</span>
+                    <ExternalLink className="w-4 h-4" />
+                  </div>
                 )}
               </div>
-            </div>
-
-            <div className="pt-3 sm:pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <span className="text-xs text-slate-500">
-                Created {new Date(link.created_at).toLocaleDateString()}
-              </span>
-              {!readOnly && (
-                <div className="flex items-center space-x-2 text-blue-600 text-sm font-medium sm:opacity-0 sm:group-hover:opacity-100 transition">
-                  <span>View Analytics</span>
-                  <ExternalLink className="w-4 h-4" />
-                </div>
-              )}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Delete Confirmation Modal */}
       {deleteConfirm.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
-            className="absolute inset-0 bg-black/50"
+            className="clickable-backdrop absolute inset-0 bg-black/50"
             onClick={cancelDelete}
           />
           <div className="relative z-10 w-full max-w-md mx-4 bg-white rounded-xl shadow-lg p-6">

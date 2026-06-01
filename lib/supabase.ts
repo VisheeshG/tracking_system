@@ -18,9 +18,19 @@ export type Profile = {
   updated_at: string;
 };
 
+export type Brand = {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Project = {
   id: string;
   user_id: string;
+  brand_id: string | null;
   name: string;
   description: string | null;
   slug: string;

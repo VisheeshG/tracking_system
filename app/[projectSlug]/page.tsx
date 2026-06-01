@@ -3,6 +3,10 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { supabase, Project, Link } from "@/lib/supabase";
+import {
+  countClicksForLinkIds,
+  fetchAllLinksForProjectId,
+} from "@/lib/supabase-pagination";
 import { LinkList } from "@/components/LinkList";
 import { TitleSearchBar } from "@/components/TitleSearchBar";
 import { matchesTitleQuery } from "@/lib/search";
@@ -138,27 +142,13 @@ export default function PublicProjectPage() {
 
       try {
         setLoading(true);
-        const { data: linksData, error: linksError } = await supabase
-          .from("links")
-          .select("*")
-          .eq("project_id", project.id)
-          .order("created_at", { ascending: false });
+        const linksData = await fetchAllLinksForProjectId(supabase, project.id);
+        setLinks(linksData);
 
-        if (linksError) {
-          setError("Failed to load links");
-          return;
-        }
-
-        setLinks(linksData || []);
-
-        if (linksData && linksData.length > 0) {
+        if (linksData.length > 0) {
           const linkIds = linksData.map((l) => l.id);
-          const { count } = await supabase
-            .from("link_clicks")
-            .select("*", { count: "exact", head: true })
-            .in("link_id", linkIds);
-
-          setTotalClicks(count || 0);
+          const clickCount = await countClicksForLinkIds(supabase, linkIds);
+          setTotalClicks(clickCount);
           setPlatformCount(new Set(linksData.map((l) => l.platform)).size);
         } else {
           setTotalClicks(0);
@@ -168,7 +158,7 @@ export default function PublicProjectPage() {
         // If URL has ?link_id=uuid, preselect that link
         const search = new URLSearchParams(window.location.search);
         const qId = search.get("link_id");
-        if (qId && linksData) {
+        if (qId && linksData.length > 0) {
           const match = linksData.find((l) => l.id === qId);
           if (match) setSelectedLinkId(match.id);
         }
